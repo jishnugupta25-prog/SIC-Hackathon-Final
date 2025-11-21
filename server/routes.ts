@@ -346,11 +346,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ placeName: "Unknown Location" });
       }
 
-      // Extract city, town, or region from address
+      // Extract most specific location name from address hierarchy
+      // Priority: suburb -> town -> hamlet -> village -> district -> city -> state -> country
       const address = data.address;
-      const placeName = address.city || address.town || address.village || address.county || address.state || address.country || data.display_name;
+      const placeName = 
+        address.suburb ||           // Most specific: suburb/locality
+        address.town ||             // Town level
+        address.hamlet ||           // Hamlet/small area
+        address.village ||          // Village
+        address.district ||         // District level
+        address.city ||             // City (fallback)
+        address.county ||           // County
+        address.state ||            // State (last resort)
+        address.country ||          // Country (last resort)
+        data.display_name;          // Display name as ultimate fallback
       
-      console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName}`);
+      console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (from: suburb=${address.suburb}, town=${address.town}, city=${address.city})`);
       res.json({
         placeName: placeName,
         displayName: data.display_name,
