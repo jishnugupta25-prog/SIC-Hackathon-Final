@@ -46,14 +46,26 @@ export async function getTwilioClient() {
 export async function getTwilioFromPhoneNumber() {
   try {
     const client = await getTwilioClient();
-    // Get the first phone number from verified phone numbers
-    const phoneNumbers = await client.incomingPhoneNumbers.list({ limit: 1 });
+    // Get all available phone numbers
+    const phoneNumbers = await client.incomingPhoneNumbers.list({ limit: 10 });
+    console.log(`Found ${phoneNumbers.length} Twilio phone numbers`);
+    
     if (phoneNumbers.length > 0) {
-      return phoneNumbers[0].phoneNumber;
+      // Find a number that's in the account and suitable for sending
+      for (const num of phoneNumbers) {
+        console.log(`Available Twilio number: ${num.phoneNumber}`);
+        return num.phoneNumber;
+      }
     }
+    
     // Fallback to configured phone number
-    const { phoneNumber } = await getCredentials();
-    return phoneNumber;
+    const credentials = await getCredentials();
+    if (credentials.phoneNumber) {
+      console.log(`Using configured Twilio number: ${credentials.phoneNumber}`);
+      return credentials.phoneNumber;
+    }
+    
+    throw new Error('No Twilio phone numbers available');
   } catch (error) {
     console.error("Error getting Twilio phone number:", error);
     throw error;
@@ -102,37 +114,41 @@ function formatPhoneNumber(phoneNumber: string): string {
 export async function sendSosMessage(to: string, userName: string, location: { latitude: number; longitude: number }) {
   try {
     const client = await getTwilioClient();
-    let from = await getTwilioFromPhoneNumber();
     
     // Ensure phone number is in correct international format
     const formattedTo = formatPhoneNumber(to);
+    console.log(`Preparing to send SMS to: ${formattedTo}`);
+    
+    let from;
+    try {
+      from = await getTwilioFromPhoneNumber();
+      console.log(`Got Twilio from number: ${from}`);
+    } catch (phoneError) {
+      console.error("Error getting from number:", phoneError);
+      throw new Error('Unable to get Twilio sender number. Please configure a phone number in Twilio account.');
+    }
     
     // Prevent sending to same number
     if (formattedTo === from) {
-      console.warn(`Cannot send SMS to same number ${formattedTo}. Using default Twilio number.`);
-      // Get from configured phone number in Twilio settings
-      const { phoneNumber } = await getCredentials();
-      if (phoneNumber && phoneNumber !== formattedTo) {
-        from = phoneNumber;
-      } else {
-        throw new Error('No valid from number configured in Twilio');
-      }
+      console.error(`BLOCKED: Cannot send SMS from ${from} to same number ${formattedTo}`);
+      throw new Error('Cannot send SOS to same phone number. Please add a different emergency contact number.');
     }
     
     const message = `EMERGENCY ALERT: User ${userName} needs urgent help! Location: https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
     
-    console.log(`Sending SOS SMS to ${formattedTo} from ${from}`);
+    console.log(`[SMS] From: ${from}, To: ${formattedTo}`);
+    console.log(`[SMS] Message: ${message}`);
     
-    await client.messages.create({
+    const result = await client.messages.create({
       body: message,
       from: from,
       to: formattedTo,
     });
     
-    console.log(`SMS sent successfully to ${formattedTo}`);
-    return { success: true };
+    console.log(`✓ SMS sent successfully. SID: ${result.sid}`);
+    return { success: true, messageSid: result.sid };
   } catch (error) {
     console.error('Twilio SMS error:', error);
-    throw new Error('Failed to send SOS message');
+    throw error;
   }
 }
