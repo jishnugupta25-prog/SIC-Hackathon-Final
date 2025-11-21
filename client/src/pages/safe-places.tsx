@@ -94,20 +94,20 @@ export default function SafePlaces() {
   }, [toast]);
 
   const { data: safePlaces = [], isLoading, isError, refetch } = useQuery<SafePlace[]>({
-    queryKey: ["/api/safe-places", Math.round(location?.latitude || 0 * 10000), Math.round(location?.longitude || 0 * 10000)],
+    queryKey: ["/api/safe-places", Math.floor(location?.latitude * 100000 || 0), Math.floor(location?.longitude * 100000 || 0)],
     queryFn: async () => {
       if (!location) throw new Error("Location not available");
       console.log("📍 Fetching safe places for:", location);
       const response = await fetch(`/api/safe-places?latitude=${location.latitude}&longitude=${location.longitude}`);
       if (!response.ok) throw new Error("Failed to fetch safe places");
       const data = await response.json();
-      console.log(`✓ Found ${data.length} nearby places:`, data.slice(0, 3));
+      console.log(`✓ Found ${data.length} nearby places with new location:`, data.slice(0, 3));
       return data;
     },
     enabled: isAuthenticated && !!location,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
-    staleTime: 5000,
+    staleTime: 0,
   });
 
   const getPlaceIcon = (type: string) => {
