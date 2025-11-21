@@ -390,11 +390,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const address = data.address || {};
       const displayName = data.display_name || "";
       
-      // Strategy: Try address components first, but validate against display_name
-      // This handles cases where OSM has incorrect suburb names
+      // Strategy: Prefer address components over display_name for accuracy
+      // Address components are more structured and reliable
       let placeName = "";
       
-      // Get candidate from address components
+      // Get candidate from address components - prioritize small/specific areas
       const addressCandidate = 
         address.suburb ||           // Most specific: suburb/locality
         address.town ||             // Town level
@@ -405,26 +405,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         address.county ||           // County
         address.state;              // State
       
-      // Parse display_name more intelligently
-      // Format is usually: "Location, Area, State, Country"
-      const displayParts = displayName.split(",").map((p: string) => p.trim());
-      const displayFirstPart = displayParts[0] || "";
-      
-      // Use display_name's first part if it looks more accurate
-      // (i.e., not a generic like "India" and different from city/state)
-      if (displayFirstPart && 
-          displayFirstPart !== address.city && 
-          displayFirstPart !== address.state && 
-          displayFirstPart !== address.country &&
-          displayFirstPart.length > 2) {
-        placeName = displayFirstPart;
-        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (from display_name first part)`);
-      } else if (addressCandidate) {
+      // If we have a good address component, use it
+      if (addressCandidate && 
+          addressCandidate !== address.city && 
+          addressCandidate !== address.state &&
+          addressCandidate.length > 2) {
         placeName = addressCandidate;
-        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (from address components: suburb=${address.suburb}, town=${address.town}, city=${address.city})`);
+        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (from address components)`);
+      } else if (address.city && address.city !== address.state) {
+        // Use city as secondary option
+        placeName = address.city;
+        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (from city)`);
       } else {
-        placeName = displayFirstPart || address.country || "Unknown Location";
-        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (fallback)`);
+        // Last resort: parse display_name carefully
+        const displayParts = displayName.split(",").map((p: string) => p.trim());
+        // Look for meaningful parts in display_name (not too short, not generic)
+        const meaningfulPart = displayParts.find((part: string) => 
+          part.length > 3 && 
+          !["India", "Country", address.state, address.city].includes(part)
+        ) || displayParts[0];
+        
+        placeName = meaningfulPart || address.country || "Unknown Location";
+        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (fallback from display_name)`);
       }
       
       // Build complete address hierarchy for display
