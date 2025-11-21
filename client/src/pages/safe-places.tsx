@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Map, Hospital, Shield, Phone, Navigation, MapPin, Pill, Search, Loader2 } from "lucide-react";
+import { Map, Hospital, Shield, Phone, Navigation, MapPin, Pill, Search, Loader2, X } from "lucide-react";
 
 interface SafePlace {
   id: string;
@@ -20,13 +20,22 @@ interface SafePlace {
   distance?: number;
 }
 
+interface Suggestion {
+  displayName: string;
+  latitude: number;
+  longitude: number;
+}
+
 export default function SafePlaces() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [location, setLocation] = useState<{ latitude: number; longitude: number; name: string } | null>(null);
   const [selectedType, setSelectedType] = useState<"all" | "hospital" | "police" | "safe_zone" | "pharmacy">("all");
   const [searchPlace, setSearchPlace] = useState("");
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -70,6 +79,45 @@ export default function SafePlaces() {
     );
   }, []);
 
+  // Handle search input with debounce
+  const handleSearchInput = (value: string) => {
+    setSearchPlace(value);
+
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    if (value.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    debounceTimer.current = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/suggestions?q=${encodeURIComponent(value)}`);
+        const data = await response.json();
+        setSuggestions(data);
+        setShowSuggestions(true);
+      } catch (error) {
+        console.error("[Suggestions] Error:", error);
+        setSuggestions([]);
+      }
+    }, 300);
+  };
+
+  const handleSelectSuggestion = (suggestion: Suggestion) => {
+    setLocation({
+      latitude: suggestion.latitude,
+      longitude: suggestion.longitude,
+      name: suggestion.displayName.split(",")[0] || suggestion.displayName,
+    });
+    setSearchPlace("");
+    setSuggestions([]);
+    setShowSuggestions(false);
+    toast({ title: "Location Found", description: suggestion.displayName });
+  };
+
   const handleSearchPlace = async () => {
     if (!searchPlace.trim()) {
       toast({ title: "Error", description: "Please enter a place name", variant: "destructive" });
@@ -96,6 +144,8 @@ export default function SafePlaces() {
         name: searchPlace,
       });
       setSearchPlace("");
+      setSuggestions([]);
+      setShowSuggestions(false);
       toast({ title: "Location Found", description: `Showing safe places near ${searchPlace}` });
     } catch (error: any) {
       console.error("[Search] Error:", error);
@@ -195,30 +245,65 @@ export default function SafePlaces() {
           <CardDescription>Enter any city, landmark, or address</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              placeholder="e.g., Central Park, Mumbai, or Hospital Road"
-              value={searchPlace}
-              onChange={(e) => setSearchPlace(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSearchPlace()}
-              data-testid="input-place-search"
-              className="h-9 text-sm flex-1"
-              disabled={isSearching}
-            />
-            <Button 
-              onClick={handleSearchPlace}
-              data-testid="button-search-place"
-              disabled={isSearching}
-              className="gap-2"
-            >
-              {isSearching ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
-              )}
-              Search
-            </Button>
+          <div className="relative">
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <Input
+                  type="text"
+                  placeholder="e.g., Mumbai, Central Park, or Hospital Road"
+                  value={searchPlace}
+                  onChange={(e) => handleSearchInput(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSearchPlace()}
+                  data-testid="input-place-search"
+                  className="h-9 text-sm"
+                  disabled={isSearching}
+                />
+                {searchPlace && (
+                  <button
+                    onClick={() => {
+                      setSearchPlace("");
+                      setSuggestions([]);
+                      setShowSuggestions(false);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+
+                {/* Suggestions Dropdown */}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-input rounded-md shadow-lg z-50">
+                    {suggestions.map((suggestion, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSelectSuggestion(suggestion)}
+                        className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground flex items-start gap-2 border-b last:border-b-0"
+                      >
+                        <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{suggestion.displayName.split(",")[0]}</p>
+                          <p className="text-xs text-muted-foreground truncate">{suggestion.displayName}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Button 
+                onClick={handleSearchPlace}
+                data-testid="button-search-place"
+                disabled={isSearching}
+                className="gap-2"
+              >
+                {isSearching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+                Search
+              </Button>
+            </div>
           </div>
           {location && (
             <p className="text-sm text-muted-foreground mt-3 flex items-center gap-2">

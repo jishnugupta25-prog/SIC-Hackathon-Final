@@ -278,6 +278,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return R * c; // Distance in kilometers
   };
 
+  // Get location suggestions as user types
+  app.get('/api/suggestions', isAuthenticated, async (req: any, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query || query.trim().length < 2) {
+        return res.json([]);
+      }
+
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8`;
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'CrimeReportPortal/1.0'
+        }
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        return res.json([]);
+      }
+
+      const data = await response.json();
+      if (!data || !Array.isArray(data)) {
+        return res.json([]);
+      }
+
+      const suggestions = data.map((item: any) => ({
+        displayName: item.display_name,
+        latitude: parseFloat(item.lat),
+        longitude: parseFloat(item.lon)
+      }));
+
+      res.json(suggestions);
+    } catch (error: any) {
+      console.error("[Suggestions] Error:", error.message);
+      res.json([]);
+    }
+  });
+
   // Geocode place name to coordinates
   app.get('/api/geocode', isAuthenticated, async (req: any, res) => {
     try {
