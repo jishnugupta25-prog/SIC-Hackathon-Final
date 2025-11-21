@@ -40,7 +40,7 @@ export default function SafePlaces() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [location, setLocation] = useState<{ latitude: number; longitude: number; name: string } | null>(null);
-  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number; accuracy: number; placeName?: string } | null>(null);
   const [locationStatus, setLocationStatus] = useState<"loading" | "active" | "disabled" | "denied">("loading");
   const [selectedType, setSelectedType] = useState<"all" | "hospital" | "police" | "safe_zone" | "pharmacy">("all");
   const [searchPlace, setSearchPlace] = useState("");
@@ -85,18 +85,29 @@ export default function SafePlaces() {
     const requestLocation = () => {
       setLocationStatus("loading");
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const currentLoc = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: Math.round(position.coords.accuracy),
           };
           console.log("[GPS] ✓ Current location:", currentLoc);
+          
+          // Fetch place name from coordinates
+          try {
+            const response = await fetch(`/api/reverse-geocode?lat=${currentLoc.latitude}&lon=${currentLoc.longitude}`);
+            const data = await response.json();
+            currentLoc.placeName = data.placeName || "Your Current Location";
+          } catch (error) {
+            console.error("[Reverse Geocode] Error:", error);
+            currentLoc.placeName = "Your Current Location";
+          }
+          
           setCurrentLocation(currentLoc);
           setLocation({
             latitude: currentLoc.latitude,
             longitude: currentLoc.longitude,
-            name: "Your Current Location",
+            name: currentLoc.placeName || "Your Current Location",
           });
           setLocationStatus("active");
         },
@@ -126,19 +137,30 @@ export default function SafePlaces() {
 
     // Watch for continuous location updates
     const watchId = navigator.geolocation.watchPosition(
-      (position) => {
+      async (position) => {
         const currentLoc = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           accuracy: Math.round(position.coords.accuracy),
         };
         console.log("[GPS] ✓ Position updated:", currentLoc);
+        
+        // Fetch place name from coordinates
+        try {
+          const response = await fetch(`/api/reverse-geocode?lat=${currentLoc.latitude}&lon=${currentLoc.longitude}`);
+          const data = await response.json();
+          currentLoc.placeName = data.placeName || "Unknown Location";
+        } catch (error) {
+          console.error("[Reverse Geocode] Error:", error);
+          currentLoc.placeName = "Unknown Location";
+        }
+        
         setCurrentLocation(currentLoc);
         if (!location) {
           setLocation({
             latitude: currentLoc.latitude,
             longitude: currentLoc.longitude,
-            name: "Your Current Location",
+            name: currentLoc.placeName || "Your Current Location",
           });
         }
         setLocationStatus("active");
@@ -341,6 +363,12 @@ export default function SafePlaces() {
 
           {locationStatus === "active" && currentLocation && (
             <div className="space-y-3">
+              {currentLocation.placeName && (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 p-3 rounded-md border border-green-200 dark:border-green-800">
+                  <p className="text-xs text-muted-foreground mb-1">📍 Current Location</p>
+                  <p className="text-sm font-semibold text-green-900 dark:text-green-100">{currentLocation.placeName}</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-green-200 dark:border-green-800">
                   <p className="text-xs text-muted-foreground mb-1">Latitude</p>
@@ -380,17 +408,27 @@ export default function SafePlaces() {
                   };
                   setLocationStatus("loading");
                   navigator.geolocation.getCurrentPosition(
-                    (position) => {
+                    async (position) => {
                       const currentLoc = {
                         latitude: position.coords.latitude,
                         longitude: position.coords.longitude,
                         accuracy: Math.round(position.coords.accuracy),
                       };
+                      
+                      // Fetch place name
+                      try {
+                        const response = await fetch(`/api/reverse-geocode?lat=${currentLoc.latitude}&lon=${currentLoc.longitude}`);
+                        const data = await response.json();
+                        currentLoc.placeName = data.placeName || "Your Current Location";
+                      } catch (error) {
+                        currentLoc.placeName = "Your Current Location";
+                      }
+                      
                       setCurrentLocation(currentLoc);
                       setLocation({
                         latitude: currentLoc.latitude,
                         longitude: currentLoc.longitude,
-                        name: "Your Current Location",
+                        name: currentLoc.placeName || "Your Current Location",
                       });
                       setLocationStatus("active");
                       toast({ title: "Success", description: "Location enabled and detected!" });
@@ -439,17 +477,27 @@ export default function SafePlaces() {
                 };
                 setLocationStatus("loading");
                 navigator.geolocation.getCurrentPosition(
-                  (position) => {
+                  async (position) => {
                     const currentLoc = {
                       latitude: position.coords.latitude,
                       longitude: position.coords.longitude,
                       accuracy: Math.round(position.coords.accuracy),
                     };
+                    
+                    // Fetch place name
+                    try {
+                      const response = await fetch(`/api/reverse-geocode?lat=${currentLoc.latitude}&lon=${currentLoc.longitude}`);
+                      const data = await response.json();
+                      currentLoc.placeName = data.placeName || "Your Current Location";
+                    } catch (error) {
+                      currentLoc.placeName = "Your Current Location";
+                    }
+                    
                     setCurrentLocation(currentLoc);
                     setLocation({
                       latitude: currentLoc.latitude,
                       longitude: currentLoc.longitude,
-                      name: "Your Current Location",
+                      name: currentLoc.placeName || "Your Current Location",
                     });
                     setLocationStatus("active");
                     setShowLocationAlert(false);

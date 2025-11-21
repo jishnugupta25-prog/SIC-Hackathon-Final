@@ -278,7 +278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return R * c; // Distance in kilometers
   };
 
-  // Get location suggestions as user types
+  // Get location suggestions as user types (worldwide search)
   app.get('/api/suggestions', isAuthenticated, async (req: any, res) => {
     try {
       const query = req.query.q as string;
@@ -286,6 +286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json([]);
       }
 
+      // Search worldwide - no viewbox restriction
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8`;
       const response = await fetch(url, {
         headers: {
@@ -309,10 +310,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         longitude: parseFloat(item.lon)
       }));
 
+      console.log(`[Suggestions] Found ${suggestions.length} results for "${query}"`);
       res.json(suggestions);
     } catch (error: any) {
       console.error("[Suggestions] Error:", error.message);
       res.json([]);
+    }
+  });
+
+  // Reverse geocode - get place name from coordinates
+  app.get('/api/reverse-geocode', isAuthenticated, async (req: any, res) => {
+    try {
+      const lat = req.query.lat as string;
+      const lon = req.query.lon as string;
+
+      if (!lat || !lon) {
+        return res.status(400).json({ message: "Latitude and longitude required" });
+      }
+
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'CrimeReportPortal/1.0'
+        }
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        return res.json({ placeName: "Unknown Location" });
+      }
+
+      const data = await response.json();
+      
+      if (!data || !data.address) {
+        return res.json({ placeName: "Unknown Location" });
+      }
+
+      // Extract city, town, or region from address
+      const address = data.address;
+      const placeName = address.city || address.town || address.village || address.county || address.state || address.country || data.display_name;
+      
+      console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName}`);
+      res.json({
+        placeName: placeName,
+        displayName: data.display_name,
+        address: data.address
+      });
+    } catch (error: any) {
+      console.error("[Reverse Geocode] Error:", error.message);
+      res.json({ placeName: "Unknown Location" });
     }
   });
 
