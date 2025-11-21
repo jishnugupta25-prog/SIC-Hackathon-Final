@@ -39,7 +39,7 @@ export default function SafePlaces() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  // Get current location with improved accuracy and permission handling
+  // Get current location with continuous tracking
   useEffect(() => {
     if (!navigator.geolocation) {
       console.error("Geolocation not supported");
@@ -53,24 +53,21 @@ export default function SafePlaces() {
 
     const options = {
       enableHighAccuracy: true,
-      timeout: 15000,
+      timeout: 10000,
       maximumAge: 0,
     };
 
     console.log("Requesting geolocation...");
 
-    navigator.geolocation.getCurrentPosition(
+    // Watch position for continuous updates
+    const watchId = navigator.geolocation.watchPosition(
       (position) => {
         const newLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         };
-        console.log("Location obtained:", newLocation);
+        console.log("✓ Location updated:", newLocation);
         setLocation(newLocation);
-        toast({
-          title: "Location Found",
-          description: `Detected at ${newLocation.latitude.toFixed(4)}, ${newLocation.longitude.toFixed(4)}`,
-        });
       },
       (error) => {
         console.error("Geolocation error:", error.code, error.message);
@@ -90,32 +87,28 @@ export default function SafePlaces() {
       },
       options
     );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, [toast]);
 
   const { data: safePlaces = [], isLoading, isError, refetch } = useQuery<SafePlace[]>({
-    queryKey: ["/api/safe-places", location?.latitude || 0, location?.longitude || 0],
+    queryKey: ["/api/safe-places", Math.round(location?.latitude || 0 * 10000), Math.round(location?.longitude || 0 * 10000)],
     queryFn: async () => {
       if (!location) throw new Error("Location not available");
-      console.log("Fetching safe places for location:", location);
+      console.log("📍 Fetching safe places for:", location);
       const response = await fetch(`/api/safe-places?latitude=${location.latitude}&longitude=${location.longitude}`);
       if (!response.ok) throw new Error("Failed to fetch safe places");
       const data = await response.json();
-      console.log("Safe places data received:", data);
+      console.log(`✓ Found ${data.length} nearby places:`, data.slice(0, 3));
       return data;
     },
     enabled: isAuthenticated && !!location,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
-    staleTime: 0,
+    staleTime: 5000,
   });
-
-  // Refetch when location changes
-  useEffect(() => {
-    if (location && isAuthenticated) {
-      console.log("Location changed, refetching safe places...");
-      refetch();
-    }
-  }, [location?.latitude, location?.longitude, isAuthenticated, refetch]);
 
   const getPlaceIcon = (type: string) => {
     switch (type) {
@@ -156,13 +149,32 @@ export default function SafePlaces() {
     window.open(url, "_blank");
   };
 
-  if (authLoading || isLoading) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-96">
         <div className="text-center space-y-2">
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-muted-foreground">Finding safe places...</p>
+          <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!location) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Navigation className="h-12 w-12 text-primary mx-auto mb-3" />
+            <h3 className="text-lg font-semibold mb-2">Getting Your Location</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Requesting permission to access your location...
+            </p>
+            <div className="h-2 w-32 mx-auto rounded-full overflow-hidden bg-muted">
+              <div className="h-full w-1/2 bg-primary animate-pulse" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
