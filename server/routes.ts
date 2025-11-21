@@ -286,23 +286,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Place name required" });
       }
 
-      // Use OpenStreetMap Nominatim API for free geocoding
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(placeName)}&format=json&limit=1`);
-      const data = await response.json();
+      console.log(`[Geocode] Searching for: ${placeName}`);
 
-      if (!data || data.length === 0) {
-        return res.status(404).json({ message: "Place not found" });
+      // Use OpenStreetMap Nominatim API with proper headers
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(placeName)}&format=json&limit=1`;
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'CrimeReportPortal/1.0'
+        }
+      });
+
+      const contentType = response.headers.get('content-type');
+      let data;
+
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error(`[Geocode] Invalid content type: ${contentType}`);
+        const text = await response.text();
+        console.error(`[Geocode] Response body: ${text.substring(0, 200)}`);
+        return res.status(500).json({ message: "Geocoding service error" });
+      }
+
+      data = await response.json();
+
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        console.log(`[Geocode] No results found for: ${placeName}`);
+        return res.status(404).json({ message: `No location found for "${placeName}". Try a larger city or region.` });
       }
 
       const location = data[0];
+      console.log(`[Geocode] Found: ${location.display_name}`);
       res.json({
         latitude: parseFloat(location.lat),
         longitude: parseFloat(location.lon),
         displayName: location.display_name
       });
     } catch (error: any) {
-      console.error("Geocoding error:", error);
-      res.status(500).json({ message: "Geocoding failed" });
+      console.error("[Geocode] Error:", error.message);
+      res.status(500).json({ message: "Unable to search location. Please try again." });
     }
   });
 

@@ -78,24 +78,28 @@ export default function SafePlaces() {
 
     setIsSearching(true);
     try {
+      console.log("[Search] Looking for:", searchPlace);
       const response = await fetch(`/api/geocode?place=${encodeURIComponent(searchPlace)}`);
       const data = await response.json();
 
       if (!response.ok) {
-        toast({ title: "Not Found", description: `Could not find "${searchPlace}"`, variant: "destructive" });
+        console.log("[Search] Not found:", data.message);
+        toast({ title: "Not Found", description: data.message || `Could not find "${searchPlace}"`, variant: "destructive" });
         setIsSearching(false);
         return;
       }
 
+      console.log("[Search] Found:", data);
       setLocation({
         latitude: data.latitude,
         longitude: data.longitude,
         name: searchPlace,
       });
       setSearchPlace("");
-      toast({ title: "Location Found", description: `Showing safe places near ${data.displayName}` });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to search location", variant: "destructive" });
+      toast({ title: "Location Found", description: `Showing safe places near ${searchPlace}` });
+    } catch (error: any) {
+      console.error("[Search] Error:", error);
+      toast({ title: "Error", description: "Failed to search location. Please try again.", variant: "destructive" });
     } finally {
       setIsSearching(false);
     }
