@@ -386,10 +386,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (fallback)`);
       }
       
+      // Build complete address hierarchy for display
+      const hierarchy = {
+        suburb: address.suburb,
+        town: address.town,
+        hamlet: address.hamlet,
+        village: address.village,
+        district: address.district,
+        city: address.city,
+        county: address.county,
+        state: address.state,
+        country: address.country
+      };
+      
+      // Filter out empty values and create hierarchy array
+      const hierarchyArray = Object.entries(hierarchy)
+        .filter(([_, value]) => value && value.length > 0)
+        .map(([_, value]) => value);
+      
       res.json({
         placeName: placeName,
         displayName: data.display_name,
-        address: data.address
+        address: data.address,
+        hierarchy: hierarchyArray,
+        fullHierarchy: hierarchy
       });
     } catch (error: any) {
       console.error("[Reverse Geocode] Error:", error.message);

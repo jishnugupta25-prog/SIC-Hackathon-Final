@@ -52,7 +52,13 @@ export default function SafePlaces() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [location, setLocation] = useState<{ latitude: number; longitude: number; name: string } | null>(null);
-  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number; accuracy: number; placeName?: string } | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<{ 
+    latitude: number; 
+    longitude: number; 
+    accuracy: number; 
+    placeName?: string;
+    hierarchy?: string[];
+  } | null>(null);
   const [locationStatus, setLocationStatus] = useState<"loading" | "active" | "disabled" | "denied">("loading");
   const [selectedType, setSelectedType] = useState<"all" | "hospital" | "police" | "safe_zone" | "pharmacy">("all");
   const [searchPlace, setSearchPlace] = useState("");
@@ -96,16 +102,17 @@ export default function SafePlaces() {
       maximumAge: 0,
     };
 
-    // Helper to fetch and cache place name (bulletproof location fetching)
-    const fetchPlaceName = async (lat: number, lon: number): Promise<string> => {
+    // Helper to fetch and cache place name with complete hierarchy
+    const fetchPlaceName = async (lat: number, lon: number, skipCache: boolean = false): Promise<{ name: string; hierarchy: string[] }> => {
       try {
         // Create cache key from rounded coordinates
         const cacheKey = `${Math.round(lat * 10000)},${Math.round(lon * 10000)}`;
         
-        // Check cache first
-        if (cacheKey in placeNameCacheRef.current) {
-          console.log(`[Cache] Found ${cacheKey} -> ${placeNameCacheRef.current[cacheKey]}`);
-          return placeNameCacheRef.current[cacheKey];
+        // Check cache first (unless forced refresh)
+        if (!skipCache && cacheKey in placeNameCacheRef.current) {
+          const cached = placeNameCacheRef.current[cacheKey];
+          console.log(`[Cache] Found ${cacheKey} -> ${cached}`);
+          return { name: cached, hierarchy: [] };
         }
         
         // Fetch from API
@@ -119,17 +126,19 @@ export default function SafePlaces() {
         
         if (!response.ok) {
           console.warn(`[Reverse Geocode] API error: ${response.status}`);
-          return "Unknown Location";
+          return { name: "Unknown Location", hierarchy: [] };
         }
         
         const data = await response.json();
         const placeName = data.placeName || "Unknown Location";
+        const hierarchy = data.hierarchy || [];
+        
         placeNameCacheRef.current[cacheKey] = placeName;
-        console.log(`[Reverse Geocode] ${lat.toFixed(4)}, ${lon.toFixed(4)} -> ${placeName}`);
-        return placeName;
+        console.log(`[Reverse Geocode] ${lat.toFixed(4)}, ${lon.toFixed(4)} -> ${placeName}, Hierarchy: ${hierarchy.join(" → ")}`);
+        return { name: placeName, hierarchy };
       } catch (error: any) {
         console.error("[Reverse Geocode] Error:", error.message || error);
-        return "Unknown Location";
+        return { name: "Unknown Location", hierarchy: [] };
       }
     };
 
@@ -158,9 +167,10 @@ export default function SafePlaces() {
           
           lastLocationRef.current = { latitude: currentLoc.latitude, longitude: currentLoc.longitude };
           
-          // Fetch place name from coordinates
-          const placeName = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude);
+          // Fetch place name and hierarchy from coordinates
+          const { name: placeName, hierarchy } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
           currentLoc.placeName = placeName;
+          currentLoc.hierarchy = hierarchy;
           
           setCurrentLocation(currentLoc);
           setLocation({
@@ -227,8 +237,9 @@ export default function SafePlaces() {
         }
         
         reverseGeoTimer.current = setTimeout(async () => {
-          const placeName = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude);
+          const { name: placeName, hierarchy } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
           currentLoc.placeName = placeName;
+          currentLoc.hierarchy = hierarchy;
           
           setCurrentLocation(currentLoc);
           if (!location) {
@@ -443,6 +454,11 @@ export default function SafePlaces() {
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 p-3 rounded-md border border-green-200 dark:border-green-800">
                   <p className="text-xs text-muted-foreground mb-1">📍 Current Location</p>
                   <p className="text-sm font-semibold text-green-900 dark:text-green-100">{currentLocation.placeName}</p>
+                  {currentLocation.hierarchy && currentLocation.hierarchy.length > 0 && (
+                    <p className="text-xs text-green-700 dark:text-green-200 mt-1 truncate">
+                      {currentLocation.hierarchy.join(" → ")}
+                    </p>
+                  )}
                 </div>
               )}
               <div className="grid grid-cols-2 gap-4">
@@ -455,9 +471,32 @@ export default function SafePlaces() {
                   <p className="text-sm font-mono font-semibold">{currentLocation.longitude.toFixed(6)}</p>
                 </div>
               </div>
-              <div className="text-xs text-muted-foreground flex items-center gap-2">
-                <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
-                Accuracy: ±{currentLocation.accuracy}m
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                  <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
+                  Accuracy: ±{currentLocation.accuracy}m
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={async () => {
+                    setLocationStatus("loading");
+                    try {
+                      const { name: placeName, hierarchy } = await fetchPlaceName(currentLocation.latitude, currentLocation.longitude, true);
+                      const updatedLoc = { ...currentLocation, placeName, hierarchy };
+                      setCurrentLocation(updatedLoc);
+                      setLocationStatus("active");
+                      toast({ title: "Refreshed", description: "Location updated successfully!" });
+                    } catch (error) {
+                      setLocationStatus("active");
+                      toast({ title: "Error", description: "Failed to refresh location", variant: "destructive" });
+                    }
+                  }}
+                  data-testid="button-refresh-location"
+                >
+                  <Navigation className="h-3 w-3 mr-1" />
+                  Refresh
+                </Button>
               </div>
             </div>
           )}
@@ -492,8 +531,9 @@ export default function SafePlaces() {
                       };
                       
                       lastLocationRef.current = { latitude: currentLoc.latitude, longitude: currentLoc.longitude };
-                      const placeName = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude);
+                      const { name: placeName, hierarchy } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
                       currentLoc.placeName = placeName;
+                      currentLoc.hierarchy = hierarchy;
                       
                       setCurrentLocation(currentLoc);
                       setLocation({
@@ -556,8 +596,9 @@ export default function SafePlaces() {
                     };
                     
                     lastLocationRef.current = { latitude: currentLoc.latitude, longitude: currentLoc.longitude };
-                    const placeName = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude);
+                    const { name: placeName, hierarchy } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
                     currentLoc.placeName = placeName;
+                    currentLoc.hierarchy = hierarchy;
                     
                     setCurrentLocation(currentLoc);
                     setLocation({
