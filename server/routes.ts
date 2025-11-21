@@ -180,58 +180,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Safe Places route (mock data for now - would integrate with Google Places API)
   app.get('/api/safe-places', isAuthenticated, async (req: any, res) => {
     try {
-      const { latitude, longitude } = req.query;
+      const latitude = parseFloat(req.query.latitude as string);
+      const longitude = parseFloat(req.query.longitude as string);
       
-      // Mock safe places data
+      // Validate coordinates
+      if (isNaN(latitude) || isNaN(longitude)) {
+        return res.status(400).json({ message: "Invalid coordinates" });
+      }
+      
+      // Mock safe places data with hospitals, police, pharmacies, and safe zones
       const safePlaces = [
         {
           id: "1",
           name: "City General Hospital",
           type: "hospital",
-          latitude: Number(latitude) + 0.01,
-          longitude: Number(longitude) + 0.01,
+          latitude: latitude + 0.008,
+          longitude: longitude + 0.012,
           address: "123 Medical Center Dr",
-          phone: "+1234567890",
-          distance: 1.2,
+          phone: "+1-555-0101",
+          distance: 0.9,
         },
         {
           id: "2",
           name: "Central Police Station",
           type: "police",
-          latitude: Number(latitude) - 0.01,
-          longitude: Number(longitude) - 0.01,
+          latitude: latitude - 0.009,
+          longitude: longitude - 0.007,
           address: "456 Safety Ave",
           phone: "911",
-          distance: 0.8,
-        },
-        {
-          id: "3",
-          name: "Community Safe Zone",
-          type: "safe_zone",
-          latitude: Number(latitude) + 0.005,
-          longitude: Number(longitude) - 0.005,
-          address: "789 Community Center Rd",
           distance: 0.6,
         },
         {
+          id: "3",
+          name: "24/7 Emergency Pharmacy",
+          type: "pharmacy",
+          latitude: latitude + 0.004,
+          longitude: longitude - 0.006,
+          address: "789 Wellness Plaza",
+          phone: "+1-555-0102",
+          distance: 0.4,
+        },
+        {
           id: "4",
-          name: "Memorial Hospital",
-          type: "hospital",
-          latitude: Number(latitude) - 0.015,
-          longitude: Number(longitude) + 0.02,
-          address: "321 Healthcare Blvd",
-          phone: "+1234567891",
-          distance: 2.1,
+          name: "Community Safe Zone",
+          type: "safe_zone",
+          latitude: latitude + 0.002,
+          longitude: longitude + 0.003,
+          address: "321 Community Center",
+          distance: 0.2,
         },
         {
           id: "5",
+          name: "Memorial Hospital",
+          type: "hospital",
+          latitude: latitude - 0.012,
+          longitude: longitude + 0.018,
+          address: "654 Healthcare Blvd",
+          phone: "+1-555-0103",
+          distance: 1.8,
+        },
+        {
+          id: "6",
           name: "North District Police",
           type: "police",
-          latitude: Number(latitude) + 0.02,
-          longitude: Number(longitude) - 0.015,
-          address: "654 Law Enforcement St",
+          latitude: latitude + 0.015,
+          longitude: longitude - 0.011,
+          address: "987 Law Enforcement St",
           phone: "911",
-          distance: 2.5,
+          distance: 1.3,
+        },
+        {
+          id: "7",
+          name: "MediCare Drugstore",
+          type: "pharmacy",
+          latitude: latitude - 0.006,
+          longitude: longitude + 0.008,
+          address: "555 Health Plaza Dr",
+          phone: "+1-555-0104",
+          distance: 0.8,
+        },
+        {
+          id: "8",
+          name: "Central Health Clinic",
+          type: "hospital",
+          latitude: latitude + 0.011,
+          longitude: longitude - 0.004,
+          address: "100 Medical Way",
+          phone: "+1-555-0105",
+          distance: 1.1,
+        },
+        {
+          id: "9",
+          name: "24-Hour Medical Pharmacy",
+          type: "pharmacy",
+          latitude: latitude + 0.007,
+          longitude: longitude + 0.014,
+          address: "222 Rx Street",
+          phone: "+1-555-0106",
+          distance: 1.2,
+        },
+        {
+          id: "10",
+          name: "South Station Police",
+          type: "police",
+          latitude: latitude - 0.014,
+          longitude: longitude + 0.011,
+          address: "333 Protection Ave",
+          phone: "911",
+          distance: 1.6,
         },
       ];
 

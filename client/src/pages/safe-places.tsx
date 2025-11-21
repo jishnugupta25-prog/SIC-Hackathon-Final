@@ -6,12 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Map, Hospital, Shield, Phone, Navigation, MapPin } from "lucide-react";
+import { Map, Hospital, Shield, Phone, Navigation, MapPin, Pill } from "lucide-react";
 
 interface SafePlace {
   id: string;
   name: string;
-  type: "hospital" | "police" | "safe_zone";
+  type: "hospital" | "police" | "safe_zone" | "pharmacy";
   latitude: number;
   longitude: number;
   address: string;
@@ -23,7 +23,7 @@ export default function SafePlaces() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [selectedType, setSelectedType] = useState<"all" | "hospital" | "police" | "safe_zone">("all");
+  const [selectedType, setSelectedType] = useState<"all" | "hospital" | "police" | "safe_zone" | "pharmacy">("all");
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -57,9 +57,13 @@ export default function SafePlaces() {
   }, []);
 
   const { data: safePlaces = [], isLoading, isError } = useQuery<SafePlace[]>({
-    queryKey: location 
-      ? ["/api/safe-places", { latitude: location.latitude, longitude: location.longitude }]
-      : ["/api/safe-places"],
+    queryKey: ["/api/safe-places", location?.latitude, location?.longitude],
+    queryFn: async () => {
+      if (!location) throw new Error("Location not available");
+      const response = await fetch(`/api/safe-places?latitude=${location.latitude}&longitude=${location.longitude}`);
+      if (!response.ok) throw new Error("Failed to fetch safe places");
+      return response.json();
+    },
     enabled: isAuthenticated && !!location,
   });
 
@@ -69,6 +73,8 @@ export default function SafePlaces() {
         return <Hospital className="h-5 w-5 text-destructive" />;
       case "police":
         return <Shield className="h-5 w-5 text-primary" />;
+      case "pharmacy":
+        return <Pill className="h-5 w-5 text-chart-3" />;
       case "safe_zone":
         return <MapPin className="h-5 w-5 text-chart-4" />;
       default:
@@ -82,6 +88,8 @@ export default function SafePlaces() {
         return "bg-destructive/10 text-destructive";
       case "police":
         return "bg-primary/10 text-primary";
+      case "pharmacy":
+        return "bg-chart-3/10 text-chart-3";
       case "safe_zone":
         return "bg-chart-4/10 text-chart-4";
       default:
@@ -151,11 +159,12 @@ export default function SafePlaces() {
                 </div>
               </div>
               <Tabs value={selectedType} onValueChange={(v) => setSelectedType(v as any)} className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-5">
                   <TabsTrigger value="all" data-testid="tab-all">All</TabsTrigger>
                   <TabsTrigger value="hospital" data-testid="tab-hospitals">Hospitals</TabsTrigger>
                   <TabsTrigger value="police" data-testid="tab-police">Police</TabsTrigger>
-                  <TabsTrigger value="safe_zone" data-testid="tab-safe-zones">Safe Zones</TabsTrigger>
+                  <TabsTrigger value="pharmacy" data-testid="tab-pharmacy">Medicine</TabsTrigger>
+                  <TabsTrigger value="safe_zone" data-testid="tab-safe-zones">Safe</TabsTrigger>
                 </TabsList>
               </Tabs>
             </CardContent>
@@ -241,7 +250,7 @@ export default function SafePlaces() {
       </div>
 
       {/* Info Cards */}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-4 gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -272,6 +281,23 @@ export default function SafePlaces() {
             </p>
             <p className="text-2xl font-bold mt-2">
               {safePlaces.filter(p => p.type === "police").length}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Pill className="h-5 w-5 text-chart-3" />
+              Pharmacies
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Medicine shops and medical supply stores nearby
+            </p>
+            <p className="text-2xl font-bold mt-2">
+              {safePlaces.filter(p => p.type === "pharmacy").length}
             </p>
           </CardContent>
         </Card>
