@@ -12,9 +12,14 @@ export default function Landing() {
             <Shield className="h-8 w-8 text-primary" />
             <span className="text-xl font-heading font-bold">Crime Report Portal</span>
           </div>
-          <Button asChild data-testid="button-login">
-            <a href="/api/login">Sign In</a>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild data-testid="button-test-login">
+              <a href="/api/test-login">Test Login</a>
+            </Button>
+            <Button asChild data-testid="button-login">
+              <a href="/api/login">Sign In</a>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -28,9 +33,12 @@ export default function Landing() {
             Your personal safety companion with emergency SOS alerts, real-time crime mapping,
             and AI-powered safety recommendations
           </p>
-          <div className="pt-4">
+          <div className="pt-4 flex gap-3 justify-center">
             <Button asChild size="lg" data-testid="button-get-started">
               <a href="/api/login">Get Started</a>
+            </Button>
+            <Button variant="outline" asChild size="lg" data-testid="button-test-demo">
+              <a href="/api/test-login">Try Demo</a>
             </Button>
           </div>
         </div>

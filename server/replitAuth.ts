@@ -69,6 +69,41 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Test login endpoint (for development/testing only)
+  app.get('/api/test-login', async (req: any, res) => {
+    try {
+      const testUser = {
+        claims: {
+          sub: 'test-user-' + Date.now(),
+          email: 'testuser@example.com',
+          first_name: 'Test',
+          last_name: 'User',
+        },
+        access_token: 'test-token',
+        refresh_token: 'test-refresh',
+        expires_at: Math.floor(Date.now() / 1000) + 86400, // 24 hours from now
+      };
+
+      // Create/upsert test user in database
+      await storage.upsertUser({
+        id: testUser.claims.sub,
+        email: testUser.claims.email,
+        firstName: testUser.claims.first_name,
+        lastName: testUser.claims.last_name,
+      });
+
+      // Set user in session
+      req.user = testUser;
+      req.login(testUser, (err) => {
+        if (err) return res.status(500).json({ message: 'Login failed' });
+        res.redirect('/');
+      });
+    } catch (error) {
+      console.error('Test login error:', error);
+      res.status(500).json({ message: 'Test login failed' });
+    }
+  });
+
   const config = await getOidcConfig();
 
   const verify: VerifyFunction = async (
