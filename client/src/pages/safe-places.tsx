@@ -73,6 +73,46 @@ export default function SafePlaces() {
   const lastLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const placeNameCacheRef = useRef<Record<string, string>>({});
 
+  // Helper to fetch and cache place name with complete hierarchy - defined outside useEffect so refresh button can use it
+  const fetchPlaceName = async (lat: number, lon: number, skipCache: boolean = false): Promise<{ name: string; hierarchy: string[] }> => {
+    try {
+      // Create cache key from rounded coordinates
+      const cacheKey = `${Math.round(lat * 10000)},${Math.round(lon * 10000)}`;
+      
+      // Check cache first (unless forced refresh)
+      if (!skipCache && cacheKey in placeNameCacheRef.current) {
+        const cached = placeNameCacheRef.current[cacheKey];
+        console.log(`[Cache] Found ${cacheKey} -> ${cached}`);
+        return { name: cached, hierarchy: [] };
+      }
+      
+      // Fetch from API
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+      
+      const response = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        console.warn(`[Reverse Geocode] API error: ${response.status}`);
+        return { name: "Unknown Location", hierarchy: [] };
+      }
+      
+      const data = await response.json();
+      const placeName = data.placeName || "Unknown Location";
+      const hierarchy = data.hierarchy || [];
+      
+      placeNameCacheRef.current[cacheKey] = placeName;
+      console.log(`[Reverse Geocode] ${lat.toFixed(4)}, ${lon.toFixed(4)} -> ${placeName}, Hierarchy: ${hierarchy.join(" → ")}`);
+      return { name: placeName, hierarchy };
+    } catch (error: any) {
+      console.error("[Reverse Geocode] Error:", error.message || error);
+      return { name: "Unknown Location", hierarchy: [] };
+    }
+  };
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -100,46 +140,6 @@ export default function SafePlaces() {
       enableHighAccuracy: true,
       timeout: 10000,
       maximumAge: 0,
-    };
-
-    // Helper to fetch and cache place name with complete hierarchy
-    const fetchPlaceName = async (lat: number, lon: number, skipCache: boolean = false): Promise<{ name: string; hierarchy: string[] }> => {
-      try {
-        // Create cache key from rounded coordinates
-        const cacheKey = `${Math.round(lat * 10000)},${Math.round(lon * 10000)}`;
-        
-        // Check cache first (unless forced refresh)
-        if (!skipCache && cacheKey in placeNameCacheRef.current) {
-          const cached = placeNameCacheRef.current[cacheKey];
-          console.log(`[Cache] Found ${cacheKey} -> ${cached}`);
-          return { name: cached, hierarchy: [] };
-        }
-        
-        // Fetch from API
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
-        
-        const response = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`, {
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          console.warn(`[Reverse Geocode] API error: ${response.status}`);
-          return { name: "Unknown Location", hierarchy: [] };
-        }
-        
-        const data = await response.json();
-        const placeName = data.placeName || "Unknown Location";
-        const hierarchy = data.hierarchy || [];
-        
-        placeNameCacheRef.current[cacheKey] = placeName;
-        console.log(`[Reverse Geocode] ${lat.toFixed(4)}, ${lon.toFixed(4)} -> ${placeName}, Hierarchy: ${hierarchy.join(" → ")}`);
-        return { name: placeName, hierarchy };
-      } catch (error: any) {
-        console.error("[Reverse Geocode] Error:", error.message || error);
-        return { name: "Unknown Location", hierarchy: [] };
-      }
     };
 
     // Request permission and get initial position
