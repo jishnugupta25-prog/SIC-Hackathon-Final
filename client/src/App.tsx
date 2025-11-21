@@ -16,11 +16,15 @@ import Contacts from "@/pages/contacts";
 import CrimeMap from "@/pages/crime-map";
 import ReportCrime from "@/pages/report-crime";
 import SafePlaces from "@/pages/safe-places";
+import Signup from "@/pages/signup";
+import Login from "@/pages/login";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/signup" component={Signup} />
+      <Route path="/login" component={Login} />
       <Route path="/contacts" component={Contacts} />
       <Route path="/crime-map" component={CrimeMap} />
       <Route path="/report-crime" component={ReportCrime} />
@@ -51,7 +55,14 @@ function AppLayout() {
   }
 
   if (!isAuthenticated) {
-    return <Landing />;
+    return (
+      <Switch>
+        <Route path="/" component={Landing} />
+        <Route path="/signup" component={Signup} />
+        <Route path="/login" component={Login} />
+        <Route component={Landing} />
+      </Switch>
+    );
   }
 
   return (

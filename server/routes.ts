@@ -8,10 +8,97 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { sendSosMessage } from "./twilio";
 import { analyzeCrimePatterns } from "./gemini";
 import { insertEmergencyContactSchema, insertCrimeReportSchema, insertSosAlertSchema } from "@shared/schema";
+import * as bcrypt from "bcryptjs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Email/Password Auth Routes
+  app.post('/api/signup', async (req: any, res) => {
+    try {
+      const { email, firstName, lastName, password } = req.body;
+
+      if (!email || !password || !firstName || !lastName) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+
+      // Check if user exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      // Hash password
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Create user
+      const user = await storage.upsertUser({
+        id: undefined as any,
+        email,
+        firstName,
+        lastName,
+        passwordHash,
+      });
+
+      // Create session
+      req.user = {
+        claims: { sub: user.id },
+        access_token: 'email-auth',
+        refresh_token: 'email-auth',
+      };
+
+      req.login(req.user, (err: any) => {
+        if (err) return res.status(500).json({ message: 'Session creation failed' });
+        res.json({ success: true, user });
+      });
+    } catch (error: any) {
+      console.error("Signup error:", error);
+      res.status(500).json({ message: error.message || "Signup failed" });
+    }
+  });
+
+  app.post('/api/email-login', async (req: any, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user || !user.passwordHash) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      // Create session
+      req.user = {
+        claims: { sub: user.id },
+        access_token: 'email-auth',
+        refresh_token: 'email-auth',
+      };
+
+      req.login(req.user, (err: any) => {
+        if (err) return res.status(500).json({ message: 'Session creation failed' });
+        res.json({ success: true, user });
+      });
+    } catch (error: any) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: error.message || "Login failed" });
+    }
+  });
+
+  app.get('/api/auth/logout', (req: any, res) => {
+    req.logout((err: any) => {
+      if (err) return res.status(500).json({ message: 'Logout failed' });
+      res.json({ success: true });
+    });
+  });
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
