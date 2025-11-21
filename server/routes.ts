@@ -46,6 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         claims: { sub: user.id },
         access_token: 'email-auth',
         refresh_token: 'email-auth',
+        expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
       };
 
       req.login(req.user, (err: any) => {
@@ -81,6 +82,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         claims: { sub: user.id },
         access_token: 'email-auth',
         refresh_token: 'email-auth',
+        expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
       };
 
       req.login(req.user, (err: any) => {
