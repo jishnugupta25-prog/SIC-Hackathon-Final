@@ -65,7 +65,7 @@ export default function SafePlaces() {
   const reverseGeoTimer = useRef<NodeJS.Timeout | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const lastLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
-  const placeNameCacheRef = useRef<Map<string, string>>(new Map());
+  const placeNameCacheRef = useRef<Record<string, string>>({});
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -96,24 +96,39 @@ export default function SafePlaces() {
       maximumAge: 0,
     };
 
-    // Helper to fetch and cache place name
-    const fetchPlaceName = async (lat: number, lon: number) => {
-      // Create cache key from rounded coordinates
-      const cacheKey = `${Math.round(lat * 10000)},${Math.round(lon * 10000)}`;
-      
-      // Check cache first
-      if (placeNameCacheRef.current.has(cacheKey)) {
-        return placeNameCacheRef.current.get(cacheKey) || "Unknown Location";
-      }
-      
+    // Helper to fetch and cache place name (bulletproof location fetching)
+    const fetchPlaceName = async (lat: number, lon: number): Promise<string> => {
       try {
-        const response = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`);
+        // Create cache key from rounded coordinates
+        const cacheKey = `${Math.round(lat * 10000)},${Math.round(lon * 10000)}`;
+        
+        // Check cache first
+        if (cacheKey in placeNameCacheRef.current) {
+          console.log(`[Cache] Found ${cacheKey} -> ${placeNameCacheRef.current[cacheKey]}`);
+          return placeNameCacheRef.current[cacheKey];
+        }
+        
+        // Fetch from API
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+        
+        const response = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          console.warn(`[Reverse Geocode] API error: ${response.status}`);
+          return "Unknown Location";
+        }
+        
         const data = await response.json();
         const placeName = data.placeName || "Unknown Location";
-        placeNameCacheRef.current.set(cacheKey, placeName);
+        placeNameCacheRef.current[cacheKey] = placeName;
+        console.log(`[Reverse Geocode] ${lat.toFixed(4)}, ${lon.toFixed(4)} -> ${placeName}`);
         return placeName;
-      } catch (error) {
-        console.error("[Reverse Geocode] Error:", error);
+      } catch (error: any) {
+        console.error("[Reverse Geocode] Error:", error.message || error);
         return "Unknown Location";
       }
     };
@@ -121,18 +136,29 @@ export default function SafePlaces() {
     // Request permission and get initial position
     const requestLocation = () => {
       setLocationStatus("loading");
+      const timeout = setTimeout(() => {
+        setLocationStatus("disabled");
+        setLocationErrorMessage("Location request timed out. Please try again.");
+        setShowLocationAlert(true);
+      }, 12000);
+      
       navigator.geolocation.getCurrentPosition(
         async (position) => {
+          clearTimeout(timeout);
           const currentLoc = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: Math.round(position.coords.accuracy),
           };
-          console.log("[GPS] ✓ Current location:", currentLoc);
+          console.log("[GPS] ✓ Current location acquired:", {
+            lat: currentLoc.latitude.toFixed(6),
+            lon: currentLoc.longitude.toFixed(6),
+            accuracy: `±${currentLoc.accuracy}m`
+          });
           
           lastLocationRef.current = { latitude: currentLoc.latitude, longitude: currentLoc.longitude };
           
-          // Fetch place name from coordinates with debouncing
+          // Fetch place name from coordinates
           const placeName = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude);
           currentLoc.placeName = placeName;
           
@@ -145,17 +171,18 @@ export default function SafePlaces() {
           setLocationStatus("active");
         },
         (error) => {
+          clearTimeout(timeout);
           console.error("[GPS] Error:", error.code, error.message);
           let errorMsg = "Unable to get your location";
           let errorStatus: "disabled" | "denied" = "disabled";
 
           if (error.code === 1) {
-            errorMsg = "Location permission denied. Please enable location services in your browser settings.";
+            errorMsg = "Location permission denied. Enable it in your browser settings to continue.";
             errorStatus = "denied";
           } else if (error.code === 2) {
-            errorMsg = "Location is unavailable. Please check your device's GPS and location services.";
+            errorMsg = "Location unavailable. Verify GPS is enabled on your device.";
           } else if (error.code === 3) {
-            errorMsg = "Location request timed out. Please check your location settings and try again.";
+            errorMsg = "Location request timed out. Please enable high accuracy GPS and retry.";
           }
 
           setLocationErrorMessage(errorMsg);
@@ -168,7 +195,7 @@ export default function SafePlaces() {
 
     requestLocation();
 
-    // Watch for continuous location updates with distance threshold
+    // Watch for continuous location updates with 100m distance threshold
     const watchId = navigator.geolocation.watchPosition(
       async (position) => {
         const currentLoc = {
@@ -177,24 +204,24 @@ export default function SafePlaces() {
           accuracy: Math.round(position.coords.accuracy),
         };
         
-        // Only update if location moved more than 100 meters
-        const shouldUpdate = !lastLocationRef.current || 
+        // Only update if location moved more than 100 meters (filters GPS noise)
+        const distance = lastLocationRef.current ? 
           calculateDistance(
             lastLocationRef.current.latitude,
             lastLocationRef.current.longitude,
             currentLoc.latitude,
             currentLoc.longitude
-          ) > 100;
+          ) : 999;
         
-        if (!shouldUpdate) {
-          console.log("[GPS] Location unchanged (< 100m), skipping update");
+        if (distance <= 100) {
+          console.log(`[GPS] Noise filtered (${Math.round(distance)}m < 100m threshold)`);
           return;
         }
         
-        console.log("[GPS] ✓ Position updated:", currentLoc);
+        console.log(`[GPS] ✓ Position updated (+${Math.round(distance)}m)`);
         lastLocationRef.current = { latitude: currentLoc.latitude, longitude: currentLoc.longitude };
         
-        // Fetch place name with debounced calls
+        // Fetch place name with 500ms debounce to avoid excessive API calls
         if (reverseGeoTimer.current) {
           clearTimeout(reverseGeoTimer.current);
         }
@@ -212,7 +239,7 @@ export default function SafePlaces() {
             });
           }
           setLocationStatus("active");
-        }, 500); // Debounce by 500ms
+        }, 500);
       },
       (error) => {
         console.error("[GPS] Watch error:", error.code);
