@@ -182,15 +182,17 @@ export default function Home() {
   return (
     <div className="space-y-6 relative">
       {/* Emergency Helpline */}
-      <div className="fixed top-4 right-4 z-40 md:top-6 md:right-6 flex flex-col items-center gap-2">
-        <p className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Emergency Helpline Number for India</p>
+      <div className="fixed top-4 right-4 z-40 md:top-6 md:right-6">
         <a 
           href="tel:112"
           className="group block"
           data-testid="helpline-112"
         >
-          <div className="animate-float bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-full h-14 w-14 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-destructive/50 flex items-center justify-center cursor-pointer hover-elevate">
-            <span className="text-2xl font-bold">112</span>
+          <div className="bg-white dark:bg-slate-900 hover:bg-gray-50 dark:hover:bg-slate-800 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 cursor-pointer hover-elevate">
+            <p className="text-sm font-semibold text-foreground whitespace-nowrap">
+              Emergency Helpline Number For India -{" "}
+              <span className="text-destructive">112</span>
+            </p>
           </div>
         </a>
       </div>
