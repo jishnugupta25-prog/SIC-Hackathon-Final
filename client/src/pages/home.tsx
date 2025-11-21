@@ -105,13 +105,20 @@ export default function Home() {
     const options = {
       enableHighAccuracy: true,
       timeout: 15000,
-      maximumAge: 0,
+      maximumAge: 30000, // Use cached position if available (30 seconds) to avoid poor accuracy readings
     };
 
     console.log("Requesting SOS location...");
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        // Filter out readings with extremely poor accuracy (>50km is unrealistic)
+        const accuracy = Math.round(position.coords.accuracy);
+        if (accuracy > 50000) {
+          console.warn(`[GPS] Ignoring SOS reading with poor accuracy: ±${accuracy}m`);
+          return;
+        }
+        
         const newLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,

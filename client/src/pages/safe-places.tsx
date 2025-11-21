@@ -139,7 +139,7 @@ export default function SafePlaces() {
     const options = {
       enableHighAccuracy: true,
       timeout: 10000,
-      maximumAge: 0,
+      maximumAge: 30000, // Use cached position if available (30 seconds) to avoid poor accuracy readings
     };
 
     // Request permission and get initial position
@@ -154,10 +154,19 @@ export default function SafePlaces() {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           clearTimeout(timeout);
+          
+          // Filter out readings with extremely poor accuracy (>50km is unrealistic)
+          const accuracy = Math.round(position.coords.accuracy);
+          if (accuracy > 50000) {
+            console.warn(`[GPS] Ignoring reading with poor accuracy: ±${accuracy}m`);
+            setLocationStatus("active");
+            return;
+          }
+          
           const currentLoc = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
-            accuracy: Math.round(position.coords.accuracy),
+            accuracy: accuracy,
           };
           console.log("[GPS] ✓ Current location acquired:", {
             lat: currentLoc.latitude.toFixed(6),
@@ -237,6 +246,12 @@ export default function SafePlaces() {
         }
         
         reverseGeoTimer.current = setTimeout(async () => {
+          // Filter out readings with extremely poor accuracy (>50km is unrealistic)
+          if (currentLoc.accuracy > 50000) {
+            console.warn(`[GPS] Watch: Ignoring reading with poor accuracy: ±${currentLoc.accuracy}m`);
+            return;
+          }
+          
           const { name: placeName, hierarchy } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
           currentLoc.placeName = placeName;
           currentLoc.hierarchy = hierarchy;
