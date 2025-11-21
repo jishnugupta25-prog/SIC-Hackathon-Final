@@ -57,7 +57,9 @@ export default function Signup() {
       }
 
       toast({ title: 'Success', description: 'Account created! Redirecting...' });
-      setTimeout(() => navigate('/'), 1500);
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 500);
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Signup failed', variant: 'destructive' });
     } finally {

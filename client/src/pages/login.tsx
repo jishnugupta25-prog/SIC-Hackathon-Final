@@ -44,7 +44,9 @@ export default function Login() {
       }
 
       toast({ title: 'Success', description: 'Logged in! Redirecting...' });
-      setTimeout(() => navigate('/'), 1500);
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 500);
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Login failed', variant: 'destructive' });
     } finally {
