@@ -24,6 +24,8 @@ export default function SafePlaces() {
   const { toast } = useToast();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedType, setSelectedType] = useState<"all" | "hospital" | "police" | "safe_zone" | "pharmacy">("all");
+  const [manualLat, setManualLat] = useState("");
+  const [manualLon, setManualLon] = useState("");
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -137,6 +139,19 @@ export default function SafePlaces() {
       refetch();
     }
   }, [location?.latitude, location?.longitude, isAuthenticated, refetch]);
+
+  const handleManualLocationSet = () => {
+    const lat = parseFloat(manualLat);
+    const lon = parseFloat(manualLon);
+    if (!isNaN(lat) && !isNaN(lon)) {
+      setLocation({ latitude: lat, longitude: lon });
+      setManualLat("");
+      setManualLon("");
+      toast({ title: "Location Updated", description: `Set to ${lat}, ${lon}` });
+    } else {
+      toast({ title: "Error", description: "Please enter valid coordinates", variant: "destructive" });
+    }
+  };
 
   const getPlaceIcon = (type: string) => {
     switch (type) {
