@@ -286,3 +286,23 @@
     inset: -1px;
   }
 }
+
+/* Floating animation for helpline number */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px);
+  }
+  25% {
+    transform: translateY(-8px) translateX(2px);
+  }
+  50% {
+    transform: translateY(-16px) translateX(-3px);
+  }
+  75% {
+    transform: translateY(-8px) translateX(3px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
