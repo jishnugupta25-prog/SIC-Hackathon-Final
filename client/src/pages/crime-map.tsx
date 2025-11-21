@@ -28,7 +28,7 @@ export default function CrimeMap() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  // Get current location with improved accuracy
+  // Get current location with improved accuracy and logging
   useEffect(() => {
     if (!navigator.geolocation) {
       console.warn("Geolocation not available");
@@ -37,19 +37,23 @@ export default function CrimeMap() {
 
     const options = {
       enableHighAccuracy: true,
-      timeout: 10000,
+      timeout: 15000,
       maximumAge: 0,
     };
 
+    console.log("Requesting crime map location...");
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLocation({
+        const newLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-        });
+        };
+        console.log("Crime map location obtained:", newLocation);
+        setLocation(newLocation);
       },
       (error) => {
-        console.error("Geolocation error:", error);
+        console.error("Geolocation error for crime map:", error.code, error.message);
       },
       options
     );

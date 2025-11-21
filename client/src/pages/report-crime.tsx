@@ -65,7 +65,7 @@ export default function ReportCrime() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  // Get current location with improved accuracy
+  // Get current location with improved accuracy and logging
   useEffect(() => {
     if (!navigator.geolocation) {
       console.warn("Geolocation not available");
@@ -74,19 +74,23 @@ export default function ReportCrime() {
 
     const options = {
       enableHighAccuracy: true,
-      timeout: 10000,
+      timeout: 15000,
       maximumAge: 0,
     };
 
+    console.log("Requesting report crime location...");
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLocation({
+        const newLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-        });
+        };
+        console.log("Report crime location obtained:", newLocation);
+        setLocation(newLocation);
       },
       (error) => {
-        console.error("Geolocation error:", error);
+        console.error("Geolocation error for crime reporting:", error.code, error.message);
       },
       options
     );

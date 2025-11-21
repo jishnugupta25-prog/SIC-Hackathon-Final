@@ -44,8 +44,20 @@ export async function getTwilioClient() {
 }
 
 export async function getTwilioFromPhoneNumber() {
-  const { phoneNumber } = await getCredentials();
-  return phoneNumber;
+  try {
+    const client = await getTwilioClient();
+    // Get the first phone number from verified phone numbers
+    const phoneNumbers = await client.incomingPhoneNumbers.list({ limit: 1 });
+    if (phoneNumbers.length > 0) {
+      return phoneNumbers[0].phoneNumber;
+    }
+    // Fallback to configured phone number
+    const { phoneNumber } = await getCredentials();
+    return phoneNumber;
+  } catch (error) {
+    console.error("Error getting Twilio phone number:", error);
+    throw error;
+  }
 }
 
 function formatPhoneNumber(phoneNumber: string): string {
@@ -90,10 +102,22 @@ function formatPhoneNumber(phoneNumber: string): string {
 export async function sendSosMessage(to: string, userName: string, location: { latitude: number; longitude: number }) {
   try {
     const client = await getTwilioClient();
-    const from = await getTwilioFromPhoneNumber();
+    let from = await getTwilioFromPhoneNumber();
     
     // Ensure phone number is in correct international format
     const formattedTo = formatPhoneNumber(to);
+    
+    // Prevent sending to same number
+    if (formattedTo === from) {
+      console.warn(`Cannot send SMS to same number ${formattedTo}. Using default Twilio number.`);
+      // Get from configured phone number in Twilio settings
+      const { phoneNumber } = await getCredentials();
+      if (phoneNumber && phoneNumber !== formattedTo) {
+        from = phoneNumber;
+      } else {
+        throw new Error('No valid from number configured in Twilio');
+      }
+    }
     
     const message = `EMERGENCY ALERT: User ${userName} needs urgent help! Location: https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
     
@@ -105,6 +129,7 @@ export async function sendSosMessage(to: string, userName: string, location: { l
       to: formattedTo,
     });
     
+    console.log(`SMS sent successfully to ${formattedTo}`);
     return { success: true };
   } catch (error) {
     console.error('Twilio SMS error:', error);

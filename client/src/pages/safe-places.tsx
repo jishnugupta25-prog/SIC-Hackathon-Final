@@ -39,9 +39,10 @@ export default function SafePlaces() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  // Get current location with improved accuracy
+  // Get current location with improved accuracy and permission handling
   useEffect(() => {
     if (!navigator.geolocation) {
+      console.error("Geolocation not supported");
       toast({
         title: "Location Not Available",
         description: "Your browser doesn't support geolocation",
@@ -52,26 +53,38 @@ export default function SafePlaces() {
 
     const options = {
       enableHighAccuracy: true,
-      timeout: 10000,
+      timeout: 15000,
       maximumAge: 0,
     };
 
+    console.log("Requesting geolocation...");
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLocation({
+        const newLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-        });
+        };
+        console.log("Location obtained:", newLocation);
+        setLocation(newLocation);
         toast({
           title: "Location Found",
-          description: "Your location has been detected",
+          description: `Detected at ${newLocation.latitude.toFixed(4)}, ${newLocation.longitude.toFixed(4)}`,
         });
       },
       (error) => {
-        console.error("Geolocation error:", error);
+        console.error("Geolocation error:", error.code, error.message);
+        let errorMsg = "Unable to get your location";
+        if (error.code === 1) {
+          errorMsg = "Location permission denied. Please enable in browser settings.";
+        } else if (error.code === 2) {
+          errorMsg = "Location unavailable. Please check your GPS.";
+        } else if (error.code === 3) {
+          errorMsg = "Location request timed out. Please try again.";
+        }
         toast({
           title: "Location Error",
-          description: "Please enable location services and refresh the page",
+          description: errorMsg,
           variant: "destructive",
         });
       },
@@ -170,14 +183,32 @@ export default function SafePlaces() {
         <div className="md:col-span-3">
           <Card>
             <CardContent className="p-6">
-              <div className="aspect-video bg-muted rounded-md flex items-center justify-center mb-4">
-                <div className="text-center space-y-2">
-                  <Map className="h-12 w-12 text-muted-foreground mx-auto" />
-                  <p className="text-sm text-muted-foreground">
-                    Safe places map will be displayed here
+              <div className="aspect-video bg-muted rounded-md flex items-center justify-center mb-4 relative overflow-hidden">
+                {/* Map Background with location info */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900" />
+                
+                {/* Your Location Marker */}
+                {location && (
+                  <div className="absolute top-4 right-4 bg-white dark:bg-slate-800 px-3 py-2 rounded-md shadow-md z-10 text-xs border border-primary/20">
+                    <p className="font-semibold flex items-center gap-2">
+                      <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                      Your Location
+                    </p>
+                    <p className="text-muted-foreground text-xs mt-1">
+                      {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+                    </p>
+                  </div>
+                )}
+                
+                <div className="relative z-0 text-center space-y-2">
+                  <Map className="h-12 w-12 text-primary/60 mx-auto" />
+                  <p className="text-sm text-foreground font-semibold">
+                    {location ? 'Your Location Detected' : 'Detecting Your Location'}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Google Maps integration with safe place markers
+                    {safePlaces.length > 0 
+                      ? `${safePlaces.length} safe places nearby` 
+                      : 'Loading safe places...'}
                   </p>
                 </div>
               </div>

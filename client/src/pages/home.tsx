@@ -95,7 +95,7 @@ export default function Home() {
     },
   });
 
-  // Get current location with improved accuracy
+  // Get current location with improved accuracy and logging
   useEffect(() => {
     if (!navigator.geolocation) {
       console.warn("Geolocation not available");
@@ -104,19 +104,23 @@ export default function Home() {
 
     const options = {
       enableHighAccuracy: true,
-      timeout: 10000,
+      timeout: 15000,
       maximumAge: 0,
     };
 
+    console.log("Requesting SOS location...");
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLocation({
+        const newLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-        });
+        };
+        console.log("SOS location obtained:", newLocation);
+        setLocation(newLocation);
       },
       (error) => {
-        console.error("Geolocation error:", error);
+        console.error("Geolocation error for SOS:", error.code, error.message);
       },
       options
     );
