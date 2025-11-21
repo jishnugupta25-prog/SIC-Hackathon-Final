@@ -7,7 +7,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Map, Hospital, Shield, Phone, Navigation, MapPin, Pill, Search, Loader2, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Map, Hospital, Shield, Phone, Navigation, MapPin, Pill, Search, Loader2, X, AlertTriangle, CheckCircle2, AlertCircle } from "lucide-react";
 
 interface SafePlace {
   id: string;
@@ -30,12 +40,17 @@ export default function SafePlaces() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [location, setLocation] = useState<{ latitude: number; longitude: number; name: string } | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
+  const [locationStatus, setLocationStatus] = useState<"loading" | "active" | "disabled" | "denied">("loading");
   const [selectedType, setSelectedType] = useState<"all" | "hospital" | "police" | "safe_zone" | "pharmacy">("all");
   const [searchPlace, setSearchPlace] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [showLocationAlert, setShowLocationAlert] = useState(false);
+  const [locationErrorMessage, setLocationErrorMessage] = useState("");
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const watchIdRef = useRef<number | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -51,32 +66,96 @@ export default function SafePlaces() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  // Get current location on mount
+  // Get current location on mount and watch for updates
   useEffect(() => {
     if (!navigator.geolocation) {
+      setLocationStatus("disabled");
+      setLocationErrorMessage("Geolocation is not supported by your browser");
+      setShowLocationAlert(true);
       return;
     }
 
     const options = {
       enableHighAccuracy: true,
-      timeout: 8000,
+      timeout: 10000,
       maximumAge: 0,
     };
 
-    navigator.geolocation.getCurrentPosition(
+    // Request permission and get initial position
+    const requestLocation = () => {
+      setLocationStatus("loading");
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const currentLoc = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: Math.round(position.coords.accuracy),
+          };
+          console.log("[GPS] ✓ Current location:", currentLoc);
+          setCurrentLocation(currentLoc);
+          setLocation({
+            latitude: currentLoc.latitude,
+            longitude: currentLoc.longitude,
+            name: "Your Current Location",
+          });
+          setLocationStatus("active");
+        },
+        (error) => {
+          console.error("[GPS] Error:", error.code, error.message);
+          let errorMsg = "Unable to get your location";
+          let errorStatus: "disabled" | "denied" = "disabled";
+
+          if (error.code === 1) {
+            errorMsg = "Location permission denied. Please enable location services in your browser settings.";
+            errorStatus = "denied";
+          } else if (error.code === 2) {
+            errorMsg = "Location is unavailable. Please check your device's GPS and location services.";
+          } else if (error.code === 3) {
+            errorMsg = "Location request timed out. Please check your location settings and try again.";
+          }
+
+          setLocationErrorMessage(errorMsg);
+          setLocationStatus(errorStatus);
+          setShowLocationAlert(true);
+        },
+        options
+      );
+    };
+
+    requestLocation();
+
+    // Watch for continuous location updates
+    const watchId = navigator.geolocation.watchPosition(
       (position) => {
-        const newLocation = {
+        const currentLoc = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-          name: "Your Current Location",
+          accuracy: Math.round(position.coords.accuracy),
         };
-        setLocation(newLocation);
+        console.log("[GPS] ✓ Position updated:", currentLoc);
+        setCurrentLocation(currentLoc);
+        if (!location) {
+          setLocation({
+            latitude: currentLoc.latitude,
+            longitude: currentLoc.longitude,
+            name: "Your Current Location",
+          });
+        }
+        setLocationStatus("active");
       },
       (error) => {
-        console.error("[GPS] Error:", error.message);
+        console.error("[GPS] Watch error:", error.code);
       },
       options
     );
+
+    watchIdRef.current = watchId;
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
   }, []);
 
   // Handle search input with debounce
@@ -234,6 +313,159 @@ export default function SafePlaces() {
           Find nearby hospitals, police stations, and safe zones
         </p>
       </div>
+
+      {/* Location Status Card */}
+      <Card className={`border-2 ${locationStatus === "active" ? "border-green-500/50 bg-green-50 dark:bg-green-950/20" : "border-red-500/50 bg-red-50 dark:bg-red-950/20"}`}>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            {locationStatus === "active" ? (
+              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 animate-pulse" />
+            ) : (
+              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 animate-pulse" />
+            )}
+            {locationStatus === "loading" ? "Detecting Location..." : locationStatus === "active" ? "Location Active" : "Location Disabled"}
+          </CardTitle>
+          <CardDescription>
+            {locationStatus === "active"
+              ? "Your device location is being tracked"
+              : "Enable location services on your device"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {locationStatus === "loading" && (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Getting your precise location...</p>
+            </div>
+          )}
+
+          {locationStatus === "active" && currentLocation && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-green-200 dark:border-green-800">
+                  <p className="text-xs text-muted-foreground mb-1">Latitude</p>
+                  <p className="text-sm font-mono font-semibold">{currentLocation.latitude.toFixed(6)}</p>
+                </div>
+                <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-green-200 dark:border-green-800">
+                  <p className="text-xs text-muted-foreground mb-1">Longitude</p>
+                  <p className="text-sm font-mono font-semibold">{currentLocation.longitude.toFixed(6)}</p>
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground flex items-center gap-2">
+                <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
+                Accuracy: ±{currentLocation.accuracy}m
+              </div>
+            </div>
+          )}
+
+          {(locationStatus === "disabled" || locationStatus === "denied") && (
+            <div className="space-y-3">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-md border border-red-200 dark:border-red-800">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">Location Services Off</p>
+                    <p className="text-xs text-red-700 dark:text-red-300">{locationErrorMessage}</p>
+                  </div>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  const options = {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0,
+                  };
+                  setLocationStatus("loading");
+                  navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                      const currentLoc = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: Math.round(position.coords.accuracy),
+                      };
+                      setCurrentLocation(currentLoc);
+                      setLocation({
+                        latitude: currentLoc.latitude,
+                        longitude: currentLoc.longitude,
+                        name: "Your Current Location",
+                      });
+                      setLocationStatus("active");
+                      toast({ title: "Success", description: "Location enabled and detected!" });
+                    },
+                    (error) => {
+                      setLocationStatus("disabled");
+                      toast({ title: "Error", description: "Still unable to access location. Please enable it in your device settings.", variant: "destructive" });
+                    },
+                    options
+                  );
+                }}
+                className="w-full"
+                data-testid="button-enable-location"
+              >
+                <Navigation className="h-3 w-3 mr-2" />
+                Enable Location Services
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                💡 <strong>Tip:</strong> Go to your browser/device settings and enable location access for this app
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Location Permission Alert Dialog */}
+      <AlertDialog open={showLocationAlert} onOpenChange={setShowLocationAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+              Enable Location Services
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {locationErrorMessage}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Dismiss</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const options = {
+                  enableHighAccuracy: true,
+                  timeout: 10000,
+                  maximumAge: 0,
+                };
+                setLocationStatus("loading");
+                navigator.geolocation.getCurrentPosition(
+                  (position) => {
+                    const currentLoc = {
+                      latitude: position.coords.latitude,
+                      longitude: position.coords.longitude,
+                      accuracy: Math.round(position.coords.accuracy),
+                    };
+                    setCurrentLocation(currentLoc);
+                    setLocation({
+                      latitude: currentLoc.latitude,
+                      longitude: currentLoc.longitude,
+                      name: "Your Current Location",
+                    });
+                    setLocationStatus("active");
+                    setShowLocationAlert(false);
+                  },
+                  () => {
+                    setLocationStatus("disabled");
+                  },
+                  options
+                );
+              }}
+            >
+              Retry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Place Search Card */}
       <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950 border-blue-200 dark:border-blue-800">
