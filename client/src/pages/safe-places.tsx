@@ -53,37 +53,41 @@ export default function SafePlaces() {
 
     const options = {
       enableHighAccuracy: true,
-      timeout: 10000,
+      timeout: 8000,
       maximumAge: 0,
     };
 
-    console.log("Requesting geolocation...");
+    console.log("[GPS] Starting location tracking...");
 
-    // Watch position for continuous updates
+    // First get position immediately
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const newLocation = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+        console.log("[GPS] ✓ Initial position:", newLocation);
+        setLocation(newLocation);
+      },
+      (error) => {
+        console.error("[GPS] Initial position error:", error.code, error.message);
+        handleLocationError(error);
+      },
+      options
+    );
+
+    // Then watch for continuous updates
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         const newLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         };
-        console.log("✓ Location updated:", newLocation);
+        console.log("[GPS] ✓ Position updated:", newLocation);
         setLocation(newLocation);
       },
       (error) => {
-        console.error("Geolocation error:", error.code, error.message);
-        let errorMsg = "Unable to get your location";
-        if (error.code === 1) {
-          errorMsg = "Location permission denied. Please enable in browser settings.";
-        } else if (error.code === 2) {
-          errorMsg = "Location unavailable. Please check your GPS.";
-        } else if (error.code === 3) {
-          errorMsg = "Location request timed out. Please try again.";
-        }
-        toast({
-          title: "Location Error",
-          description: errorMsg,
-          variant: "destructive",
-        });
+        console.error("[GPS] Watch error:", error.code, error.message);
       },
       options
     );
@@ -93,15 +97,31 @@ export default function SafePlaces() {
     };
   }, [toast]);
 
+  const handleLocationError = (error: GeolocationPositionError) => {
+    let errorMsg = "Unable to get your location";
+    if (error.code === 1) {
+      errorMsg = "Location permission denied. Please enable in browser settings.";
+    } else if (error.code === 2) {
+      errorMsg = "Location unavailable. Please check your GPS.";
+    } else if (error.code === 3) {
+      errorMsg = "Location request timed out. Please try again.";
+    }
+    toast({
+      title: "Location Error",
+      description: errorMsg,
+      variant: "destructive",
+    });
+  };
+
   const { data: safePlaces = [], isLoading, isError, refetch } = useQuery<SafePlace[]>({
-    queryKey: ["/api/safe-places", Math.floor(location?.latitude * 100000 || 0), Math.floor(location?.longitude * 100000 || 0)],
+    queryKey: ["/api/safe-places", location?.latitude, location?.longitude],
     queryFn: async () => {
       if (!location) throw new Error("Location not available");
-      console.log("📍 Fetching safe places for:", location);
+      console.log("[API] Fetching safe places for:", location);
       const response = await fetch(`/api/safe-places?latitude=${location.latitude}&longitude=${location.longitude}`);
       if (!response.ok) throw new Error("Failed to fetch safe places");
       const data = await response.json();
-      console.log(`✓ Found ${data.length} nearby places with new location:`, data.slice(0, 3));
+      console.log(`[API] ✓ Fetched ${data.length} places:`, data.slice(0, 3));
       return data;
     },
     enabled: isAuthenticated && !!location,
@@ -109,6 +129,14 @@ export default function SafePlaces() {
     refetchOnWindowFocus: false,
     staleTime: 0,
   });
+
+  // Auto-refetch when location changes
+  useEffect(() => {
+    if (location && isAuthenticated) {
+      console.log("[Query] Triggering refetch for new location...");
+      refetch();
+    }
+  }, [location?.latitude, location?.longitude, isAuthenticated, refetch]);
 
   const getPlaceIcon = (type: string) => {
     switch (type) {
