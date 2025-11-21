@@ -278,6 +278,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return R * c; // Distance in kilometers
   };
 
+  // Geocode place name to coordinates
+  app.get('/api/geocode', isAuthenticated, async (req: any, res) => {
+    try {
+      const placeName = req.query.place as string;
+      if (!placeName || placeName.trim().length === 0) {
+        return res.status(400).json({ message: "Place name required" });
+      }
+
+      // Use OpenStreetMap Nominatim API for free geocoding
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(placeName)}&format=json&limit=1`);
+      const data = await response.json();
+
+      if (!data || data.length === 0) {
+        return res.status(404).json({ message: "Place not found" });
+      }
+
+      const location = data[0];
+      res.json({
+        latitude: parseFloat(location.lat),
+        longitude: parseFloat(location.lon),
+        displayName: location.display_name
+      });
+    } catch (error: any) {
+      console.error("Geocoding error:", error);
+      res.status(500).json({ message: "Geocoding failed" });
+    }
+  });
+
   // Safe Places route - calculates distances based on user location
   app.get('/api/safe-places', isAuthenticated, async (req: any, res) => {
     try {

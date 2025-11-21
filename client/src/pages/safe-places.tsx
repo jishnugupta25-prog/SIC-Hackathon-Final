@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Map, Hospital, Shield, Phone, Navigation, MapPin, Pill } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Map, Hospital, Shield, Phone, Navigation, MapPin, Pill, Search, Loader2 } from "lucide-react";
 
 interface SafePlace {
   id: string;
@@ -23,10 +23,10 @@ interface SafePlace {
 export default function SafePlaces() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number; name: string } | null>(null);
   const [selectedType, setSelectedType] = useState<"all" | "hospital" | "police" | "safe_zone" | "pharmacy">("all");
-  const [manualLat, setManualLat] = useState("");
-  const [manualLon, setManualLon] = useState("");
+  const [searchPlace, setSearchPlace] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -42,15 +42,9 @@ export default function SafePlaces() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  // Get current location with continuous tracking
+  // Get current location on mount
   useEffect(() => {
     if (!navigator.geolocation) {
-      console.error("Geolocation not supported");
-      toast({
-        title: "Location Not Available",
-        description: "Your browser doesn't support geolocation",
-        variant: "destructive",
-      });
       return;
     }
 
@@ -60,72 +54,60 @@ export default function SafePlaces() {
       maximumAge: 0,
     };
 
-    console.log("[GPS] Starting location tracking...");
-
-    // First get position immediately
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const newLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
+          name: "Your Current Location",
         };
-        console.log("[GPS] ✓ Initial position:", newLocation);
         setLocation(newLocation);
       },
       (error) => {
-        console.error("[GPS] Initial position error:", error.code, error.message);
-        handleLocationError(error);
+        console.error("[GPS] Error:", error.message);
       },
       options
     );
+  }, []);
 
-    // Then watch for continuous updates
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const newLocation = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        };
-        console.log("[GPS] ✓ Position updated:", newLocation);
-        setLocation(newLocation);
-      },
-      (error) => {
-        console.error("[GPS] Watch error:", error.code, error.message);
-      },
-      options
-    );
-
-    return () => {
-      navigator.geolocation.clearWatch(watchId);
-    };
-  }, [toast]);
-
-  const handleLocationError = (error: GeolocationPositionError) => {
-    let errorMsg = "Unable to get your location";
-    if (error.code === 1) {
-      errorMsg = "Location permission denied. Please enable in browser settings.";
-    } else if (error.code === 2) {
-      errorMsg = "Location unavailable. Please check your GPS.";
-    } else if (error.code === 3) {
-      errorMsg = "Location request timed out. Please try again.";
+  const handleSearchPlace = async () => {
+    if (!searchPlace.trim()) {
+      toast({ title: "Error", description: "Please enter a place name", variant: "destructive" });
+      return;
     }
-    toast({
-      title: "Location Error",
-      description: errorMsg,
-      variant: "destructive",
-    });
+
+    setIsSearching(true);
+    try {
+      const response = await fetch(`/api/geocode?place=${encodeURIComponent(searchPlace)}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast({ title: "Not Found", description: `Could not find "${searchPlace}"`, variant: "destructive" });
+        setIsSearching(false);
+        return;
+      }
+
+      setLocation({
+        latitude: data.latitude,
+        longitude: data.longitude,
+        name: searchPlace,
+      });
+      setSearchPlace("");
+      toast({ title: "Location Found", description: `Showing safe places near ${data.displayName}` });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to search location", variant: "destructive" });
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const { data: safePlaces = [], isLoading, isError, refetch } = useQuery<SafePlace[]>({
     queryKey: ["/api/safe-places", location?.latitude, location?.longitude],
     queryFn: async () => {
       if (!location) throw new Error("Location not available");
-      console.log("[API] Fetching safe places for:", location);
       const response = await fetch(`/api/safe-places?latitude=${location.latitude}&longitude=${location.longitude}`);
       if (!response.ok) throw new Error("Failed to fetch safe places");
-      const data = await response.json();
-      console.log(`[API] ✓ Fetched ${data.length} places:`, data.slice(0, 3));
-      return data;
+      return response.json();
     },
     enabled: isAuthenticated && !!location,
     refetchOnMount: true,
@@ -136,23 +118,9 @@ export default function SafePlaces() {
   // Auto-refetch when location changes
   useEffect(() => {
     if (location && isAuthenticated) {
-      console.log("[Query] Triggering refetch for new location...");
       refetch();
     }
   }, [location?.latitude, location?.longitude, isAuthenticated, refetch]);
-
-  const handleManualLocationSet = () => {
-    const lat = parseFloat(manualLat);
-    const lon = parseFloat(manualLon);
-    if (!isNaN(lat) && !isNaN(lon)) {
-      setLocation({ latitude: lat, longitude: lon });
-      setManualLat("");
-      setManualLon("");
-      toast({ title: "Location Updated", description: `Set to ${lat.toFixed(4)}, ${lon.toFixed(4)}` });
-    } else {
-      toast({ title: "Error", description: "Please enter valid coordinates", variant: "destructive" });
-    }
-  };
 
   const getPlaceIcon = (type: string) => {
     switch (type) {
@@ -204,72 +172,6 @@ export default function SafePlaces() {
     );
   }
 
-  if (!location) {
-    return (
-      <div className="flex items-center justify-center min-h-96">
-        <Card>
-          <CardContent className="p-8 text-center space-y-4">
-            <Navigation className="h-12 w-12 text-primary mx-auto" />
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Getting Your Location</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Requesting permission to access your location...
-              </p>
-            </div>
-            
-            <div className="border-t pt-4 space-y-2">
-              <p className="text-xs text-muted-foreground font-medium">Or enter coordinates manually:</p>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  placeholder="Latitude"
-                  value={manualLat}
-                  onChange={(e) => setManualLat(e.target.value)}
-                  step="0.0001"
-                  data-testid="input-manual-lat"
-                  className="h-8 text-sm"
-                />
-                <Input
-                  type="number"
-                  placeholder="Longitude"
-                  value={manualLon}
-                  onChange={(e) => setManualLon(e.target.value)}
-                  step="0.0001"
-                  data-testid="input-manual-lon"
-                  className="h-8 text-sm"
-                />
-              </div>
-              <Button 
-                size="sm" 
-                onClick={handleManualLocationSet}
-                data-testid="button-set-location"
-                className="w-full"
-              >
-                Set Location
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="flex items-center justify-center min-h-96">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <Shield className="h-12 w-12 text-destructive mx-auto mb-3" />
-            <h3 className="text-lg font-semibold mb-2">Failed to Load Safe Places</h3>
-            <p className="text-sm text-muted-foreground">
-              Unable to fetch safe places. Please try again later.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -279,241 +181,263 @@ export default function SafePlaces() {
         </p>
       </div>
 
-      {/* Manual Location Tester */}
-      <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+      {/* Place Search Card */}
+      <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950 border-blue-200 dark:border-blue-800">
         <CardHeader>
-          <CardTitle className="text-sm">Test Location</CardTitle>
-          <CardDescription>Update location for testing</CardDescription>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Search className="h-5 w-5" />
+            Search Location
+          </CardTitle>
+          <CardDescription>Enter any city, landmark, or address</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex gap-2">
             <Input
-              type="number"
-              placeholder="Latitude"
-              value={manualLat}
-              onChange={(e) => setManualLat(e.target.value)}
-              step="0.0001"
-              data-testid="input-test-lat"
-              className="h-9 text-sm"
-            />
-            <Input
-              type="number"
-              placeholder="Longitude"
-              value={manualLon}
-              onChange={(e) => setManualLon(e.target.value)}
-              step="0.0001"
-              data-testid="input-test-lon"
-              className="h-9 text-sm"
+              type="text"
+              placeholder="e.g., Central Park, Mumbai, or Hospital Road"
+              value={searchPlace}
+              onChange={(e) => setSearchPlace(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && handleSearchPlace()}
+              data-testid="input-place-search"
+              className="h-9 text-sm flex-1"
+              disabled={isSearching}
             />
             <Button 
-              size="sm" 
-              onClick={handleManualLocationSet}
-              data-testid="button-set-test-location"
+              onClick={handleSearchPlace}
+              data-testid="button-search-place"
+              disabled={isSearching}
+              className="gap-2"
             >
-              Set
+              {isSearching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+              Search
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Current: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-          </p>
+          {location && (
+            <p className="text-sm text-muted-foreground mt-3 flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              Showing results near: <strong>{location.name}</strong>
+            </p>
+          )}
         </CardContent>
       </Card>
 
-      <div className="grid md:grid-cols-5 gap-6">
-        {/* Map Area */}
-        <div className="md:col-span-3">
-          <Card>
-            <CardContent className="p-6">
-              <div className="aspect-video bg-muted rounded-md flex items-center justify-center mb-4 relative overflow-hidden">
-                {/* Map Background with location info */}
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900" />
-                
-                {/* Your Location Marker */}
-                {location && (
-                  <div className="absolute top-4 right-4 bg-white dark:bg-slate-800 px-3 py-2 rounded-md shadow-md z-10 text-xs border border-primary/20">
-                    <p className="font-semibold flex items-center gap-2">
-                      <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                      Your Location
+      {!location ? (
+        <Card>
+          <CardContent className="p-12 text-center space-y-4">
+            <Navigation className="h-16 w-16 text-primary mx-auto" />
+            <div>
+              <h3 className="text-xl font-semibold mb-2">Find Safe Places</h3>
+              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                Search for any city, area, or landmark above to discover nearby hospitals, police stations, pharmacies, and safe zones.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid md:grid-cols-5 gap-6">
+          {/* Map Area */}
+          <div className="md:col-span-3">
+            <Card>
+              <CardContent className="p-6">
+                <div className="aspect-video bg-muted rounded-md flex items-center justify-center mb-4 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900" />
+                  
+                  {location && (
+                    <div className="absolute top-4 right-4 bg-white dark:bg-slate-800 px-3 py-2 rounded-md shadow-md z-10 text-xs border border-primary/20 max-w-xs">
+                      <p className="font-semibold flex items-center gap-2">
+                        <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                        {location.name}
+                      </p>
+                      <p className="text-muted-foreground text-xs mt-1 truncate">
+                        {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="relative z-0 text-center space-y-2">
+                    <Map className="h-12 w-12 text-primary/60 mx-auto" />
+                    <p className="text-sm text-foreground font-semibold">
+                      {location ? 'Location Detected' : 'Detecting Location'}
                     </p>
-                    <p className="text-muted-foreground text-xs mt-1">
-                      {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+                    <p className="text-xs text-muted-foreground">
+                      {safePlaces.length > 0 
+                        ? `${safePlaces.length} safe places nearby` 
+                        : 'Loading safe places...'}
                     </p>
                   </div>
-                )}
-                
-                <div className="relative z-0 text-center space-y-2">
-                  <Map className="h-12 w-12 text-primary/60 mx-auto" />
-                  <p className="text-sm text-foreground font-semibold">
-                    {location ? 'Your Location Detected' : 'Detecting Your Location'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {safePlaces.length > 0 
-                      ? `${safePlaces.length} safe places nearby` 
-                      : 'Loading safe places...'}
-                  </p>
                 </div>
-              </div>
-              <Tabs value={selectedType} onValueChange={(v) => setSelectedType(v as any)} className="w-full">
-                <TabsList className="grid w-full grid-cols-5">
-                  <TabsTrigger value="all" data-testid="tab-all">All</TabsTrigger>
-                  <TabsTrigger value="hospital" data-testid="tab-hospitals">Hospitals</TabsTrigger>
-                  <TabsTrigger value="police" data-testid="tab-police">Police</TabsTrigger>
-                  <TabsTrigger value="pharmacy" data-testid="tab-pharmacy">Medicine</TabsTrigger>
-                  <TabsTrigger value="safe_zone" data-testid="tab-safe-zones">Safe</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </div>
+                <Tabs value={selectedType} onValueChange={(v) => setSelectedType(v as any)} className="w-full">
+                  <TabsList className="grid w-full grid-cols-5">
+                    <TabsTrigger value="all" data-testid="tab-all">All</TabsTrigger>
+                    <TabsTrigger value="hospital" data-testid="tab-hospitals">Hospitals</TabsTrigger>
+                    <TabsTrigger value="police" data-testid="tab-police">Police</TabsTrigger>
+                    <TabsTrigger value="pharmacy" data-testid="tab-pharmacy">Medicine</TabsTrigger>
+                    <TabsTrigger value="safe_zone" data-testid="tab-safe-zones">Safe</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </div>
 
-        {/* Safe Places List */}
-        <div className="md:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Nearby Locations</CardTitle>
-              <CardDescription>
-                {filteredPlaces.length} place{filteredPlaces.length !== 1 ? 's' : ''} found
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!location ? (
-                <div className="text-center py-8">
-                  <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground">Enable location to find nearby safe places</p>
-                </div>
-              ) : filteredPlaces.length === 0 ? (
-                <div className="text-center py-8">
-                  <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground">No safe places found nearby</p>
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                  {filteredPlaces.map((place) => (
-                    <div
-                      key={place.id}
-                      className="p-4 rounded-md border space-y-3"
-                      data-testid={`place-${place.id}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`h-10 w-10 rounded-md flex items-center justify-center flex-shrink-0 ${getPlaceColor(place.type)}`}>
-                          {getPlaceIcon(place.type)}
+          {/* Safe Places List */}
+          <div className="md:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Nearby Locations</CardTitle>
+                <CardDescription>
+                  {filteredPlaces.length} place{filteredPlaces.length !== 1 ? 's' : ''} found
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                ) : isError ? (
+                  <div className="text-center py-8">
+                    <Shield className="h-12 w-12 text-destructive mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground">Failed to load safe places</p>
+                  </div>
+                ) : filteredPlaces.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground">No safe places found nearby</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                    {filteredPlaces.map((place) => (
+                      <div
+                        key={place.id}
+                        className="p-4 rounded-md border space-y-3"
+                        data-testid={`place-${place.id}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`h-10 w-10 rounded-md flex items-center justify-center flex-shrink-0 ${getPlaceColor(place.type)}`}>
+                            {getPlaceIcon(place.type)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-sm">{place.name}</h3>
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                              {place.address}
+                            </p>
+                            {place.distance !== undefined && (
+                              <Badge variant="secondary" className="mt-2 text-xs">
+                                {place.distance.toFixed(1)} km away
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-sm">{place.name}</h3>
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                            {place.address}
-                          </p>
-                          {place.distance !== undefined && (
-                            <Badge variant="secondary" className="mt-2 text-xs">
-                              {place.distance.toFixed(1)} km away
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => openInMaps(place.latitude, place.longitude, place.name)}
-                          data-testid={`button-directions-${place.id}`}
-                        >
-                          <Navigation className="h-3 w-3 mr-2" />
-                          Directions
-                        </Button>
-                        {place.phone && (
+                        <div className="flex gap-2">
                           <Button
                             size="sm"
                             variant="outline"
-                            asChild
-                            data-testid={`button-call-${place.id}`}
+                            className="flex-1"
+                            onClick={() => openInMaps(place.latitude, place.longitude, place.name)}
+                            data-testid={`button-directions-${place.id}`}
                           >
-                            <a href={`tel:${place.phone}`}>
-                              <Phone className="h-3 w-3 mr-2" />
-                              Call
-                            </a>
+                            <Navigation className="h-3 w-3 mr-2" />
+                            Directions
                           </Button>
-                        )}
+                          {place.phone && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              asChild
+                              data-testid={`button-call-${place.id}`}
+                            >
+                              <a href={`tel:${place.phone}`}>
+                                <Phone className="h-3 w-3 mr-2" />
+                                Call
+                              </a>
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Info Cards */}
+      {location && (
+        <div className="grid md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Hospital className="h-5 w-5 text-destructive" />
+                Hospitals
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Medical facilities for emergencies
+              </p>
+              <p className="text-2xl font-bold mt-2">
+                {safePlaces.filter(p => p.type === "hospital").length}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                Police Stations
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Law enforcement stations
+              </p>
+              <p className="text-2xl font-bold mt-2">
+                {safePlaces.filter(p => p.type === "police").length}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Pill className="h-5 w-5 text-chart-3" />
+                Pharmacies
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Medicine shops
+              </p>
+              <p className="text-2xl font-bold mt-2">
+                {safePlaces.filter(p => p.type === "pharmacy").length}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-chart-4" />
+                Safe Zones
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Safe gathering areas
+              </p>
+              <p className="text-2xl font-bold mt-2">
+                {safePlaces.filter(p => p.type === "safe_zone").length}
+              </p>
             </CardContent>
           </Card>
         </div>
-      </div>
-
-      {/* Info Cards */}
-      <div className="grid md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Hospital className="h-5 w-5 text-destructive" />
-              Hospitals
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Medical facilities for emergencies and urgent care
-            </p>
-            <p className="text-2xl font-bold mt-2">
-              {safePlaces.filter(p => p.type === "hospital").length}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              Police Stations
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Law enforcement stations for reporting crimes
-            </p>
-            <p className="text-2xl font-bold mt-2">
-              {safePlaces.filter(p => p.type === "police").length}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Pill className="h-5 w-5 text-chart-3" />
-              Pharmacies
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Medicine shops and medical stores
-            </p>
-            <p className="text-2xl font-bold mt-2">
-              {safePlaces.filter(p => p.type === "pharmacy").length}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-chart-4" />
-              Safe Zones
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Community centers and safe gathering areas
-            </p>
-            <p className="text-2xl font-bold mt-2">
-              {safePlaces.filter(p => p.type === "safe_zone").length}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      )}
     </div>
   );
 }
