@@ -48,17 +48,61 @@ export async function getTwilioFromPhoneNumber() {
   return phoneNumber;
 }
 
+function formatPhoneNumber(phoneNumber: string): string {
+  // Remove any spaces, dashes, or special characters
+  let cleaned = phoneNumber.replace(/[\s\-\(\)\.]/g, '');
+  
+  // If it starts with +, it's already in international format
+  if (cleaned.startsWith('+')) {
+    return cleaned;
+  }
+  
+  // If it starts with 0, replace with country code (assume India +91 if not specified)
+  if (cleaned.startsWith('0')) {
+    return '+91' + cleaned.substring(1);
+  }
+  
+  // If it's just digits and doesn't start with +, assume India
+  if (/^\d+$/.test(cleaned)) {
+    // If it's 10 digits, it's an Indian number without country code
+    if (cleaned.length === 10) {
+      return '+91' + cleaned;
+    }
+    // If it's already 12 digits (91 + 10), format it
+    if (cleaned.length === 12 && cleaned.startsWith('91')) {
+      return '+' + cleaned;
+    }
+  }
+  
+  // If no country code detected and it's a 10-digit Indian number, add +91
+  if (cleaned.length === 10) {
+    return '+91' + cleaned;
+  }
+  
+  // Otherwise, add + if not present
+  if (!cleaned.startsWith('+')) {
+    return '+' + cleaned;
+  }
+  
+  return cleaned;
+}
+
 export async function sendSosMessage(to: string, userName: string, location: { latitude: number; longitude: number }) {
   try {
     const client = await getTwilioClient();
     const from = await getTwilioFromPhoneNumber();
     
+    // Ensure phone number is in correct international format
+    const formattedTo = formatPhoneNumber(to);
+    
     const message = `EMERGENCY ALERT: User ${userName} needs urgent help! Location: https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
+    
+    console.log(`Sending SOS SMS to ${formattedTo} from ${from}`);
     
     await client.messages.create({
       body: message,
       from: from,
-      to: to,
+      to: formattedTo,
     });
     
     return { success: true };

@@ -39,22 +39,45 @@ export default function SafePlaces() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  // Get current location
+  // Get current location with improved accuracy
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          });
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-        }
-      );
+    if (!navigator.geolocation) {
+      toast({
+        title: "Location Not Available",
+        description: "Your browser doesn't support geolocation",
+        variant: "destructive",
+      });
+      return;
     }
-  }, []);
+
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        toast({
+          title: "Location Found",
+          description: "Your location has been detected",
+        });
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        toast({
+          title: "Location Error",
+          description: "Please enable location services and refresh the page",
+          variant: "destructive",
+        });
+      },
+      options
+    );
+  }, [toast]);
 
   const { data: safePlaces = [], isLoading, isError } = useQuery<SafePlace[]>({
     queryKey: ["/api/safe-places", location?.latitude, location?.longitude],

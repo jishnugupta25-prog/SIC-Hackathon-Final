@@ -65,21 +65,31 @@ export default function ReportCrime() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  // Get current location
+  // Get current location with improved accuracy
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          });
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-        }
-      );
+    if (!navigator.geolocation) {
+      console.warn("Geolocation not available");
+      return;
     }
+
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+      },
+      options
+    );
   }, []);
 
   const form = useForm<ReportFormData>({
