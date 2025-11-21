@@ -342,14 +342,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const data = await response.json();
       
-      if (!data || !data.address) {
+      if (!data) {
         return res.json({ placeName: "Unknown Location" });
       }
 
-      // Extract most specific location name from address hierarchy
-      // Priority: suburb -> town -> hamlet -> village -> district -> city -> state -> country
-      const address = data.address;
-      const placeName = 
+      const address = data.address || {};
+      const displayName = data.display_name || "";
+      
+      // Strategy: Try address components first, but validate against display_name
+      // This handles cases where OSM has incorrect suburb names
+      let placeName = "";
+      
+      // Get candidate from address components
+      const addressCandidate = 
         address.suburb ||           // Most specific: suburb/locality
         address.town ||             // Town level
         address.hamlet ||           // Hamlet/small area
@@ -357,11 +362,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         address.district ||         // District level
         address.city ||             // City (fallback)
         address.county ||           // County
-        address.state ||            // State (last resort)
-        address.country ||          // Country (last resort)
-        data.display_name;          // Display name as ultimate fallback
+        address.state;              // State
       
-      console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (from: suburb=${address.suburb}, town=${address.town}, city=${address.city})`);
+      // Parse display_name more intelligently
+      // Format is usually: "Location, Area, State, Country"
+      const displayParts = displayName.split(",").map((p: string) => p.trim());
+      const displayFirstPart = displayParts[0] || "";
+      
+      // Use display_name's first part if it looks more accurate
+      // (i.e., not a generic like "India" and different from city/state)
+      if (displayFirstPart && 
+          displayFirstPart !== address.city && 
+          displayFirstPart !== address.state && 
+          displayFirstPart !== address.country &&
+          displayFirstPart.length > 2) {
+        placeName = displayFirstPart;
+        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (from display_name first part)`);
+      } else if (addressCandidate) {
+        placeName = addressCandidate;
+        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (from address components: suburb=${address.suburb}, town=${address.town}, city=${address.city})`);
+      } else {
+        placeName = displayFirstPart || address.country || "Unknown Location";
+        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (fallback)`);
+      }
+      
       res.json({
         placeName: placeName,
         displayName: data.display_name,
