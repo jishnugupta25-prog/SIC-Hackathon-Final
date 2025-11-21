@@ -94,7 +94,7 @@ export async function setupAuth(app: Express) {
 
       // Set user in session
       req.user = testUser;
-      req.login(testUser, (err) => {
+      req.login(testUser, (err: any) => {
         if (err) return res.status(500).json({ message: 'Login failed' });
         res.redirect('/');
       });
