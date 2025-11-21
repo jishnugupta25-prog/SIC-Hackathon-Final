@@ -129,11 +129,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/contacts', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
       const contactData = insertEmergencyContactSchema.parse({
         ...req.body,
         userId,
       });
       const contact = await storage.createEmergencyContact(contactData);
+
+      // Send confirmation SMS to the emergency contact (India-friendly)
+      try {
+        const userName = user.firstName && user.lastName 
+          ? `${user.firstName} ${user.lastName}` 
+          : user.email || "User";
+        
+        const confirmationMsg = `Hello! ${userName} has added your number as an emergency contact in the Crime Report Portal. You will receive alerts if they trigger the SOS button. If this wasn't you, please contact them.`;
+        
+        const client = await (await import('./twilio')).getTwilioClient();
+        const { formatPhoneNumber } = await import('./twilio');
+        const formattedPhone = (await import('./twilio')).formatPhoneNumber || ((p: string) => p);
+        
+        // Try to send but don't fail the contact creation if SMS fails
+        try {
+          const twilioFrom = await (await import('./twilio')).getTwilioFromPhoneNumber();
+          const formattedTo = (require('./twilio') as any).formatPhoneNumber?.(contact.phoneNumber) || 
+            (contact.phoneNumber.startsWith('+') ? contact.phoneNumber : '+91' + contact.phoneNumber.replace(/^0/, ''));
+          
+          if (formattedTo !== twilioFrom) {
+            await client.messages.create({
+              body: confirmationMsg,
+              from: twilioFrom,
+              to: formattedTo,
+            });
+            console.log(`✓ Confirmation SMS sent to ${contact.phoneNumber}`);
+          }
+        } catch (smsError) {
+          console.warn(`SMS confirmation failed (non-critical): ${smsError}`);
+          // Don't fail the contact creation if SMS fails
+        }
+      } catch (smsError) {
+        console.warn(`Could not send confirmation SMS: ${smsError}`);
+        // Continue anyway - contact creation is still successful
+      }
+
       res.json(contact);
     } catch (error: any) {
       console.error("Error creating contact:", error);

@@ -72,7 +72,7 @@ export async function getTwilioFromPhoneNumber() {
   }
 }
 
-function formatPhoneNumber(phoneNumber: string): string {
+export function formatPhoneNumber(phoneNumber: string): string {
   // Remove any spaces, dashes, or special characters
   let cleaned = phoneNumber.replace(/[\s\-\(\)\.]/g, '');
   
