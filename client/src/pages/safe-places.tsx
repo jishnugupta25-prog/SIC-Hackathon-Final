@@ -56,8 +56,10 @@ export default function SafePlaces() {
     }
   }, []);
 
-  const { data: safePlaces = [], isLoading } = useQuery<SafePlace[]>({
-    queryKey: ["/api/safe-places", location?.latitude, location?.longitude],
+  const { data: safePlaces = [], isLoading, isError } = useQuery<SafePlace[]>({
+    queryKey: location 
+      ? ["/api/safe-places", { latitude: location.latitude, longitude: location.longitude }]
+      : ["/api/safe-places"],
     enabled: isAuthenticated && !!location,
   });
 
@@ -103,6 +105,22 @@ export default function SafePlaces() {
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-sm text-muted-foreground">Finding safe places...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Shield className="h-12 w-12 text-destructive mx-auto mb-3" />
+            <h3 className="text-lg font-semibold mb-2">Failed to Load Safe Places</h3>
+            <p className="text-sm text-muted-foreground">
+              Unable to fetch safe places. Please try again later.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }

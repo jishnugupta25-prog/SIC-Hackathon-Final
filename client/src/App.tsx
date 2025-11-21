@@ -18,27 +18,19 @@ import ReportCrime from "@/pages/report-crime";
 import SafePlaces from "@/pages/safe-places";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
-
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
-      ) : (
-        <>
-          <Route path="/" component={Home} />
-          <Route path="/contacts" component={Contacts} />
-          <Route path="/crime-map" component={CrimeMap} />
-          <Route path="/report-crime" component={ReportCrime} />
-          <Route path="/safe-places" component={SafePlaces} />
-        </>
-      )}
+      <Route path="/" component={Home} />
+      <Route path="/contacts" component={Contacts} />
+      <Route path="/crime-map" component={CrimeMap} />
+      <Route path="/report-crime" component={ReportCrime} />
+      <Route path="/safe-places" component={SafePlaces} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-function App() {
+function AppLayout() {
   const { isAuthenticated, isLoading } = useAuth();
 
   // Custom sidebar width for safety application
@@ -47,27 +39,44 @@ function App() {
     "--sidebar-width-icon": "4rem",
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center space-y-2">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Landing />;
+  }
+
+  return (
+    <SidebarProvider style={style as React.CSSProperties}>
+      <div className="flex h-screen w-full">
+        <AppSidebar />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <header className="flex items-center gap-4 border-b px-4 h-14 flex-shrink-0">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex-1" />
+          </header>
+          <main className="flex-1 overflow-y-auto p-6">
+            <Router />
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        {isLoading || !isAuthenticated ? (
-          <Router />
-        ) : (
-          <SidebarProvider style={style as React.CSSProperties}>
-            <div className="flex h-screen w-full">
-              <AppSidebar />
-              <div className="flex flex-col flex-1 overflow-hidden">
-                <header className="flex items-center gap-4 border-b px-4 h-14 flex-shrink-0">
-                  <SidebarTrigger data-testid="button-sidebar-toggle" />
-                  <div className="flex-1" />
-                </header>
-                <main className="flex-1 overflow-y-auto p-6">
-                  <Router />
-                </main>
-              </div>
-            </div>
-          </SidebarProvider>
-        )}
+        <AppLayout />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

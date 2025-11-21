@@ -45,12 +45,12 @@ export default function CrimeMap() {
     }
   }, []);
 
-  const { data: crimes = [], isLoading } = useQuery<CrimeReport[]>({
+  const { data: crimes = [], isLoading, isError } = useQuery<CrimeReport[]>({
     queryKey: ["/api/crimes"],
     enabled: isAuthenticated,
   });
 
-  const { data: aiInsights, isLoading: aiLoading } = useQuery<{ analysis: string; recommendations: string[] }>({
+  const { data: aiInsights, isLoading: aiLoading, isError: aiError } = useQuery<{ analysis: string; recommendations: string[] }>({
     queryKey: ["/api/ai/crime-analysis"],
     enabled: isAuthenticated && crimes.length > 0,
   });
@@ -95,6 +95,22 @@ export default function CrimeMap() {
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-sm text-muted-foreground">Loading crime data...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-3" />
+            <h3 className="text-lg font-semibold mb-2">Failed to Load Crime Data</h3>
+            <p className="text-sm text-muted-foreground">
+              Unable to fetch crime reports. Please try again later.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -205,6 +221,10 @@ export default function CrimeMap() {
                   <div className="h-6 w-6 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
                   <p className="text-xs text-muted-foreground mt-2">Analyzing crime patterns...</p>
                 </div>
+              ) : aiError ? (
+                <p className="text-sm text-muted-foreground">
+                  Unable to generate AI insights at this time
+                </p>
               ) : aiInsights ? (
                 <div className="space-y-3">
                   <div>
