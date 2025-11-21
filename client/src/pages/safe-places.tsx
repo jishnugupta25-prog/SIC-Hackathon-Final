@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Map, Hospital, Shield, Phone, Navigation, MapPin, Pill } from "lucide-react";
 
@@ -147,7 +148,7 @@ export default function SafePlaces() {
       setLocation({ latitude: lat, longitude: lon });
       setManualLat("");
       setManualLon("");
-      toast({ title: "Location Updated", description: `Set to ${lat}, ${lon}` });
+      toast({ title: "Location Updated", description: `Set to ${lat.toFixed(4)}, ${lon.toFixed(4)}` });
     } else {
       toast({ title: "Error", description: "Please enter valid coordinates", variant: "destructive" });
     }
@@ -207,14 +208,45 @@ export default function SafePlaces() {
     return (
       <div className="flex items-center justify-center min-h-96">
         <Card>
-          <CardContent className="p-8 text-center">
-            <Navigation className="h-12 w-12 text-primary mx-auto mb-3" />
-            <h3 className="text-lg font-semibold mb-2">Getting Your Location</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Requesting permission to access your location...
-            </p>
-            <div className="h-2 w-32 mx-auto rounded-full overflow-hidden bg-muted">
-              <div className="h-full w-1/2 bg-primary animate-pulse" />
+          <CardContent className="p-8 text-center space-y-4">
+            <Navigation className="h-12 w-12 text-primary mx-auto" />
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Getting Your Location</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Requesting permission to access your location...
+              </p>
+            </div>
+            
+            <div className="border-t pt-4 space-y-2">
+              <p className="text-xs text-muted-foreground font-medium">Or enter coordinates manually:</p>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  placeholder="Latitude"
+                  value={manualLat}
+                  onChange={(e) => setManualLat(e.target.value)}
+                  step="0.0001"
+                  data-testid="input-manual-lat"
+                  className="h-8 text-sm"
+                />
+                <Input
+                  type="number"
+                  placeholder="Longitude"
+                  value={manualLon}
+                  onChange={(e) => setManualLon(e.target.value)}
+                  step="0.0001"
+                  data-testid="input-manual-lon"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <Button 
+                size="sm" 
+                onClick={handleManualLocationSet}
+                data-testid="button-set-location"
+                className="w-full"
+              >
+                Set Location
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -246,6 +278,46 @@ export default function SafePlaces() {
           Find nearby hospitals, police stations, and safe zones
         </p>
       </div>
+
+      {/* Manual Location Tester */}
+      <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+        <CardHeader>
+          <CardTitle className="text-sm">Test Location</CardTitle>
+          <CardDescription>Update location for testing</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              placeholder="Latitude"
+              value={manualLat}
+              onChange={(e) => setManualLat(e.target.value)}
+              step="0.0001"
+              data-testid="input-test-lat"
+              className="h-9 text-sm"
+            />
+            <Input
+              type="number"
+              placeholder="Longitude"
+              value={manualLon}
+              onChange={(e) => setManualLon(e.target.value)}
+              step="0.0001"
+              data-testid="input-test-lon"
+              className="h-9 text-sm"
+            />
+            <Button 
+              size="sm" 
+              onClick={handleManualLocationSet}
+              data-testid="button-set-test-location"
+            >
+              Set
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Current: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+          </p>
+        </CardContent>
+      </Card>
 
       <div className="grid md:grid-cols-5 gap-6">
         {/* Map Area */}
@@ -417,7 +489,7 @@ export default function SafePlaces() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Medicine shops and medical supply stores nearby
+              Medicine shops and medical stores
             </p>
             <p className="text-2xl font-bold mt-2">
               {safePlaces.filter(p => p.type === "pharmacy").length}
@@ -434,7 +506,7 @@ export default function SafePlaces() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Community-designated safe gathering areas
+              Community centers and safe gathering areas
             </p>
             <p className="text-2xl font-bold mt-2">
               {safePlaces.filter(p => p.type === "safe_zone").length}
