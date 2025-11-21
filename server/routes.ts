@@ -266,119 +266,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Safe Places route (mock data for now - would integrate with Google Places API)
+  // Calculate distance using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in kilometers
+  };
+
+  // Safe Places route - calculates distances based on user location
   app.get('/api/safe-places', isAuthenticated, async (req: any, res) => {
     try {
-      const latitude = parseFloat(req.query.latitude as string);
-      const longitude = parseFloat(req.query.longitude as string);
+      const userLat = parseFloat(req.query.latitude as string);
+      const userLon = parseFloat(req.query.longitude as string);
       
       // Validate coordinates
-      if (isNaN(latitude) || isNaN(longitude)) {
+      if (isNaN(userLat) || isNaN(userLon)) {
         return res.status(400).json({ message: "Invalid coordinates" });
       }
       
-      // Mock safe places data with hospitals, police, pharmacies, and safe zones
-      const safePlaces = [
-        {
-          id: "1",
-          name: "City General Hospital",
-          type: "hospital",
-          latitude: latitude + 0.008,
-          longitude: longitude + 0.012,
-          address: "123 Medical Center Dr",
-          phone: "+1-555-0101",
-          distance: 0.9,
-        },
-        {
-          id: "2",
-          name: "Central Police Station",
-          type: "police",
-          latitude: latitude - 0.009,
-          longitude: longitude - 0.007,
-          address: "456 Safety Ave",
-          phone: "911",
-          distance: 0.6,
-        },
-        {
-          id: "3",
-          name: "24/7 Emergency Pharmacy",
-          type: "pharmacy",
-          latitude: latitude + 0.004,
-          longitude: longitude - 0.006,
-          address: "789 Wellness Plaza",
-          phone: "+1-555-0102",
-          distance: 0.4,
-        },
-        {
-          id: "4",
-          name: "Community Safe Zone",
-          type: "safe_zone",
-          latitude: latitude + 0.002,
-          longitude: longitude + 0.003,
-          address: "321 Community Center",
-          distance: 0.2,
-        },
-        {
-          id: "5",
-          name: "Memorial Hospital",
-          type: "hospital",
-          latitude: latitude - 0.012,
-          longitude: longitude + 0.018,
-          address: "654 Healthcare Blvd",
-          phone: "+1-555-0103",
-          distance: 1.8,
-        },
-        {
-          id: "6",
-          name: "North District Police",
-          type: "police",
-          latitude: latitude + 0.015,
-          longitude: longitude - 0.011,
-          address: "987 Law Enforcement St",
-          phone: "911",
-          distance: 1.3,
-        },
-        {
-          id: "7",
-          name: "MediCare Drugstore",
-          type: "pharmacy",
-          latitude: latitude - 0.006,
-          longitude: longitude + 0.008,
-          address: "555 Health Plaza Dr",
-          phone: "+1-555-0104",
-          distance: 0.8,
-        },
-        {
-          id: "8",
-          name: "Central Health Clinic",
-          type: "hospital",
-          latitude: latitude + 0.011,
-          longitude: longitude - 0.004,
-          address: "100 Medical Way",
-          phone: "+1-555-0105",
-          distance: 1.1,
-        },
-        {
-          id: "9",
-          name: "24-Hour Medical Pharmacy",
-          type: "pharmacy",
-          latitude: latitude + 0.007,
-          longitude: longitude + 0.014,
-          address: "222 Rx Street",
-          phone: "+1-555-0106",
-          distance: 1.2,
-        },
-        {
-          id: "10",
-          name: "South Station Police",
-          type: "police",
-          latitude: latitude - 0.014,
-          longitude: longitude + 0.011,
-          address: "333 Protection Ave",
-          phone: "911",
-          distance: 1.6,
-        },
+      console.log(`[Safe Places] User location: ${userLat}, ${userLon}`);
+      
+      // Mock safe places with dynamic locations around user
+      const places = [
+        { name: "City General Hospital", type: "hospital", latOffset: 0.008, lonOffset: 0.012, address: "123 Medical Center Dr", phone: "+1-555-0101" },
+        { name: "Central Police Station", type: "police", latOffset: -0.009, lonOffset: -0.007, address: "456 Safety Ave", phone: "911" },
+        { name: "24/7 Emergency Pharmacy", type: "pharmacy", latOffset: 0.004, lonOffset: -0.006, address: "789 Wellness Plaza", phone: "+1-555-0102" },
+        { name: "Community Safe Zone", type: "safe_zone", latOffset: 0.002, lonOffset: 0.003, address: "321 Community Center", phone: "" },
+        { name: "Memorial Hospital", type: "hospital", latOffset: -0.012, lonOffset: 0.018, address: "654 Healthcare Blvd", phone: "+1-555-0103" },
+        { name: "North District Police", type: "police", latOffset: 0.015, lonOffset: -0.011, address: "987 Law Enforcement St", phone: "911" },
+        { name: "MediCare Drugstore", type: "pharmacy", latOffset: -0.006, lonOffset: 0.008, address: "555 Health Plaza Dr", phone: "+1-555-0104" },
+        { name: "Central Health Clinic", type: "hospital", latOffset: 0.011, lonOffset: -0.004, address: "100 Medical Way", phone: "+1-555-0105" },
+        { name: "24-Hour Medical Pharmacy", type: "pharmacy", latOffset: 0.007, lonOffset: 0.014, address: "222 Rx Street", phone: "+1-555-0106" },
+        { name: "South Station Police", type: "police", latOffset: -0.014, lonOffset: 0.011, address: "333 Protection Ave", phone: "911" },
       ];
+
+      // Calculate distances for each place
+      const safePlaces = places.map((place, idx) => {
+        const placeLat = userLat + place.latOffset;
+        const placeLon = userLon + place.lonOffset;
+        const distance = calculateDistance(userLat, userLon, placeLat, placeLon);
+        return {
+          id: String(idx + 1),
+          name: place.name,
+          type: place.type,
+          latitude: placeLat,
+          longitude: placeLon,
+          address: place.address,
+          phone: place.phone,
+          distance: Math.round(distance * 100) / 100, // Round to 2 decimals
+        };
+      });
+
+      // Sort by distance (closest first)
+      safePlaces.sort((a, b) => a.distance - b.distance);
+      
+      console.log(`[Safe Places] Found ${safePlaces.length} places. Closest: ${safePlaces[0].name} (${safePlaces[0].distance}km)`);
 
       res.json(safePlaces);
     } catch (error) {
