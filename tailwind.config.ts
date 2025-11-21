@@ -83,8 +83,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["var(--font-sans)"],
-        serif: ["var(--font-serif)"],
+        sans: ["Inter", "var(--font-sans)"],
+        heading: ["Space Grotesk", "var(--font-serif)"],
         mono: ["var(--font-mono)"],
       },
       keyframes: {
