@@ -81,14 +81,15 @@ export class DatabaseStorage implements IStorage {
 
   // Emergency Contacts operations
   async getEmergencyContacts(userId: string): Promise<EmergencyContact[]> {
+    const db = await getDb();
     return await db
       .select()
       .from(emergencyContacts)
-      .where(eq(emergencyContacts.userId, userId))
-      .orderBy(emergencyContacts.createdAt);
+      .where(eq(emergencyContacts.userId, userId));
   }
 
   async createEmergencyContact(contact: InsertEmergencyContact): Promise<EmergencyContact> {
+    const db = await getDb();
     const [newContact] = await db
       .insert(emergencyContacts)
       .values(contact)
@@ -97,6 +98,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteEmergencyContact(id: string, userId: string): Promise<void> {
+    const db = await getDb();
     await db
       .delete(emergencyContacts)
       .where(and(eq(emergencyContacts.id, id), eq(emergencyContacts.userId, userId)));
@@ -104,6 +106,7 @@ export class DatabaseStorage implements IStorage {
 
   // Crime Reports operations
   async getCrimeReports(): Promise<CrimeReport[]> {
+    const db = await getDb();
     return await db
       .select()
       .from(crimeReports)
@@ -112,6 +115,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRecentCrimeReports(limit: number = 20): Promise<CrimeReport[]> {
+    const db = await getDb();
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
@@ -124,6 +128,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserCrimeReports(userId: string): Promise<CrimeReport[]> {
+    const db = await getDb();
     return await db
       .select()
       .from(crimeReports)
@@ -132,6 +137,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCrimeReport(report: InsertCrimeReport): Promise<CrimeReport> {
+    const db = await getDb();
     const [newReport] = await db
       .insert(crimeReports)
       .values(report)
@@ -141,6 +147,7 @@ export class DatabaseStorage implements IStorage {
 
   // SOS Alerts operations
   async createSosAlert(alert: InsertSosAlert): Promise<SosAlert> {
+    const db = await getDb();
     const [newAlert] = await db
       .insert(sosAlerts)
       .values(alert)
@@ -149,6 +156,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserSosAlerts(userId: string): Promise<SosAlert[]> {
+    const db = await getDb();
     return await db
       .select()
       .from(sosAlerts)
