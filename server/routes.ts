@@ -602,7 +602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Safe Places route - calculates distances based on user location
+  // Safe Places route - fetches real locations with phone numbers from OpenStreetMap
   app.get('/api/safe-places', isAuthenticated, async (req: any, res) => {
     try {
       const userLat = parseFloat(req.query.latitude as string);
@@ -613,43 +613,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid coordinates" });
       }
       
-      console.log(`[Safe Places] User location: ${userLat}, ${userLon}`);
+      console.log(`[Safe Places] Fetching real locations for: ${userLat}, ${userLon}`);
       
-      // Mock safe places with dynamic locations around user
-      const places = [
-        { name: "City General Hospital", type: "hospital", latOffset: 0.008, lonOffset: 0.012, address: "123 Medical Center Dr", phone: "+1-555-0101" },
-        { name: "Central Police Station", type: "police", latOffset: -0.009, lonOffset: -0.007, address: "456 Safety Ave", phone: "911" },
-        { name: "24/7 Emergency Pharmacy", type: "pharmacy", latOffset: 0.004, lonOffset: -0.006, address: "789 Wellness Plaza", phone: "+1-555-0102" },
-        { name: "Community Safe Zone", type: "safe_zone", latOffset: 0.002, lonOffset: 0.003, address: "321 Community Center", phone: "" },
-        { name: "Memorial Hospital", type: "hospital", latOffset: -0.012, lonOffset: 0.018, address: "654 Healthcare Blvd", phone: "+1-555-0103" },
-        { name: "North District Police", type: "police", latOffset: 0.015, lonOffset: -0.011, address: "987 Law Enforcement St", phone: "911" },
-        { name: "MediCare Drugstore", type: "pharmacy", latOffset: -0.006, lonOffset: 0.008, address: "555 Health Plaza Dr", phone: "+1-555-0104" },
-        { name: "Central Health Clinic", type: "hospital", latOffset: 0.011, lonOffset: -0.004, address: "100 Medical Way", phone: "+1-555-0105" },
-        { name: "24-Hour Medical Pharmacy", type: "pharmacy", latOffset: 0.007, lonOffset: 0.014, address: "222 Rx Street", phone: "+1-555-0106" },
-        { name: "South Station Police", type: "police", latOffset: -0.014, lonOffset: 0.011, address: "333 Protection Ave", phone: "911" },
+      // Search for real locations using Nominatim API
+      const searchTypes = [
+        { amenity: "hospital", type: "hospital", radius: 0.05 },
+        { amenity: "police", type: "police", radius: 0.05 },
+        { amenity: "pharmacy", type: "pharmacy", radius: 0.05 },
+        { amenity: "community_center", type: "safe_zone", radius: 0.05 },
       ];
 
-      // Calculate distances for each place
-      const safePlaces = places.map((place, idx) => {
-        const placeLat = userLat + place.latOffset;
-        const placeLon = userLon + place.lonOffset;
-        const distance = calculateDistance(userLat, userLon, placeLat, placeLon);
-        return {
-          id: String(idx + 1),
-          name: place.name,
-          type: place.type,
-          latitude: placeLat,
-          longitude: placeLon,
-          address: place.address,
-          phone: place.phone,
-          distance: Math.round(distance * 100) / 100, // Round to 2 decimals
-        };
-      });
+      let allPlaces: any[] = [];
+
+      for (const searchType of searchTypes) {
+        try {
+          // Search for this type of location near user
+          const bbox = `${userLon - searchType.radius},${userLat - searchType.radius},${userLon + searchType.radius},${userLat + searchType.radius}`;
+          const url = `https://nominatim.openstreetmap.org/search?amenity=${searchType.amenity}&viewbox=${bbox}&bounded=1&format=json&limit=10`;
+          
+          const response = await fetch(url, {
+            headers: { 'User-Agent': 'CrimeReportPortal/1.0' }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            
+            if (Array.isArray(data)) {
+              data.forEach((location: any, idx: number) => {
+                const distance = calculateDistance(userLat, userLon, parseFloat(location.lat), parseFloat(location.lon));
+                
+                allPlaces.push({
+                  id: `${searchType.type}-${idx}`,
+                  name: location.display_name?.split(',')[0] || location.name || 'Unknown Location',
+                  type: searchType.type,
+                  latitude: parseFloat(location.lat),
+                  longitude: parseFloat(location.lon),
+                  address: location.display_name || 'No address available',
+                  phone: location.address?.phone || location.phone || '',
+                  distance: Math.round(distance * 100) / 100,
+                });
+              });
+            }
+          }
+        } catch (error) {
+          console.warn(`[Safe Places] Error searching for ${searchType.amenity}:`, error);
+        }
+      }
+
+      // Remove duplicates (same location, different search results)
+      const uniquePlaces: any[] = [];
+      const seenLocations = new Set<string>();
+
+      for (const place of allPlaces) {
+        const locKey = `${Math.round(place.latitude * 1000)},${Math.round(place.longitude * 1000)}`;
+        if (!seenLocations.has(locKey)) {
+          seenLocations.add(locKey);
+          uniquePlaces.push(place);
+        }
+      }
 
       // Sort by distance (closest first)
-      safePlaces.sort((a, b) => a.distance - b.distance);
+      uniquePlaces.sort((a, b) => a.distance - b.distance);
       
-      console.log(`[Safe Places] Found ${safePlaces.length} places. Closest: ${safePlaces[0].name} (${safePlaces[0].distance}km)`);
+      // Limit to top 15 closest places
+      const safePlaces = uniquePlaces.slice(0, 15);
+      
+      console.log(`[Safe Places] Found ${safePlaces.length} unique places. Closest: ${safePlaces[0]?.name} (${safePlaces[0]?.distance}km)`);
 
       res.json(safePlaces);
     } catch (error) {
