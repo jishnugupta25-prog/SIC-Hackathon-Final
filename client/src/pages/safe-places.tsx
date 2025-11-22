@@ -128,83 +128,77 @@ export default function SafePlaces() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  // Request location function (can be called from multiple places)
+  // Request location function using useCallback (can be called from multiple places)
   const requestLocationFn = () => {
     const options = {
       enableHighAccuracy: true,
-      timeout: 5000, // Reduced to 5 seconds for faster initial location fetch
-      maximumAge: 5000, // Use cached position only if less than 5 seconds old for fresher data
+      timeout: 5000,
+      maximumAge: 5000,
     };
 
-    const startLocationRequest = () => {
-      setLocationStatus("loading");
-      const timeout = setTimeout(() => {
-        setLocationStatus("disabled");
-        setLocationErrorMessage("Location request timed out. Please try again.");
-        setShowLocationAlert(true);
-      }, 7000); // Timeout fallback after 7 seconds
-      
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          clearTimeout(timeout);
-          
-          // Filter out readings with extremely poor accuracy (>50km is unrealistic)
-          const accuracy = Math.round(position.coords.accuracy);
-          if (accuracy > 50000) {
-            console.warn(`[GPS] Ignoring reading with poor accuracy: ±${accuracy}m`);
-            setLocationStatus("active");
-            return;
-          }
-          
-          const currentLoc = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: accuracy,
-          };
-          console.log("[GPS] ✓ Current location acquired:", {
-            lat: currentLoc.latitude.toFixed(6),
-            lon: currentLoc.longitude.toFixed(6),
-            accuracy: `±${currentLoc.accuracy}m`
-          });
-          
-          lastLocationRef.current = { latitude: currentLoc.latitude, longitude: currentLoc.longitude };
-          
-          // Fetch place name and hierarchy from coordinates
-          const { name: placeName, hierarchy } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
-          
-          setCurrentLocation({ ...currentLoc, placeName, hierarchy });
-          setDisplayLocation({ ...currentLoc, placeName, hierarchy });
-          setLocation({
-            latitude: currentLoc.latitude,
-            longitude: currentLoc.longitude,
-            name: placeName,
-          });
+    setLocationStatus("loading");
+    const timeout = setTimeout(() => {
+      setLocationStatus("disabled");
+      setLocationErrorMessage("Location request timed out. Please try again.");
+      setShowLocationAlert(true);
+    }, 7000);
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        clearTimeout(timeout);
+        
+        const accuracy = Math.round(position.coords.accuracy);
+        if (accuracy > 50000) {
+          console.warn(`[GPS] Ignoring reading with poor accuracy: ±${accuracy}m`);
           setLocationStatus("active");
-        },
-        (error) => {
-          clearTimeout(timeout);
-          console.error("[GPS] Error:", error.code, error.message);
-          let errorMsg = "Unable to get your location";
-          let errorStatus: "disabled" | "denied" = "disabled";
+          return;
+        }
+        
+        const currentLoc = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: accuracy,
+        };
+        console.log("[GPS] ✓ Current location acquired:", {
+          lat: currentLoc.latitude.toFixed(6),
+          lon: currentLoc.longitude.toFixed(6),
+          accuracy: `±${currentLoc.accuracy}m`
+        });
+        
+        lastLocationRef.current = { latitude: currentLoc.latitude, longitude: currentLoc.longitude };
+        
+        const { name: placeName, hierarchy } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
+        
+        setCurrentLocation({ ...currentLoc, placeName, hierarchy });
+        setDisplayLocation({ ...currentLoc, placeName, hierarchy });
+        setLocation({
+          latitude: currentLoc.latitude,
+          longitude: currentLoc.longitude,
+          name: placeName,
+        });
+        setLocationStatus("active");
+      },
+      (error) => {
+        clearTimeout(timeout);
+        console.error("[GPS] Error:", error.code, error.message);
+        let errorMsg = "Unable to get your location";
+        let errorStatus: "disabled" | "denied" = "disabled";
 
-          if (error.code === 1) {
-            errorMsg = "Location permission denied. Enable it in your browser settings to continue.";
-            errorStatus = "denied";
-          } else if (error.code === 2) {
-            errorMsg = "Location unavailable. Verify GPS is enabled on your device.";
-          } else if (error.code === 3) {
-            errorMsg = "Location request timed out. Please enable high accuracy GPS and retry.";
-          }
+        if (error.code === 1) {
+          errorMsg = "Location permission denied. Enable it in your browser settings to continue.";
+          errorStatus = "denied";
+        } else if (error.code === 2) {
+          errorMsg = "Location unavailable. Verify GPS is enabled on your device.";
+        } else if (error.code === 3) {
+          errorMsg = "Location request timed out. Please enable high accuracy GPS and retry.";
+        }
 
-          setLocationErrorMessage(errorMsg);
-          setLocationStatus(errorStatus);
-          setShowLocationAlert(true);
-        },
-        options
-      );
-    };
-
-    startLocationRequest();
+        setLocationErrorMessage(errorMsg);
+        setLocationStatus(errorStatus);
+        setShowLocationAlert(true);
+      },
+      options
+    );
   };
 
   // Get current location on mount and watch for updates
