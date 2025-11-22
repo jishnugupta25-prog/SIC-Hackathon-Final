@@ -36,8 +36,8 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   passwordHash: varchar("password_hash"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at"),
+  updatedAt: timestamp("updated_at"),
 });
 
 export type UpsertUser = typeof users.$inferInsert;
@@ -50,7 +50,7 @@ export const emergencyContacts = pgTable("emergency_contacts", {
   name: varchar("name", { length: 255 }).notNull(),
   phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
   relationship: varchar("relationship", { length: 100 }),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at"),
 });
 
 export const emergencyContactsRelations = relations(emergencyContacts, ({ one }) => ({
@@ -78,8 +78,8 @@ export const crimeReports = pgTable("crime_reports", {
   longitude: real("longitude").notNull(),
   address: text("address"),
   isAnonymous: boolean("is_anonymous").default(false),
-  reportedAt: timestamp("reported_at").defaultNow(),
-  createdAt: timestamp("created_at").defaultNow(),
+  reportedAt: timestamp("reported_at"),
+  createdAt: timestamp("created_at"),
 });
 
 export const crimeReportsRelations = relations(crimeReports, ({ one }) => ({
@@ -106,13 +106,13 @@ export const sosAlerts = pgTable("sos_alerts", {
   longitude: real("longitude").notNull(),
   address: text("address"),
   sentTo: text("sent_to").array(),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at"),
 });
 
 export const sosAlertsRelations = relations(sosAlerts, ({ one }) => ({
   user: one(users, {
     fields: [sosAlerts.userId],
-    references: [users.id],
+    references: [sosAlerts.id],
   }),
 }));
 

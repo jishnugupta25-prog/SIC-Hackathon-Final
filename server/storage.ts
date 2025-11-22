@@ -57,23 +57,24 @@ export class DatabaseStorage implements IStorage {
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     const db = await getDb();
+    const now = new Date();
     // For email-based signup, generate a new ID if not provided
     if (!userData.id) {
       const [user] = await db
         .insert(users)
-        .values({ ...userData, id: randomUUID() })
+        .values({ ...userData, id: randomUUID(), createdAt: now, updatedAt: now })
         .returning();
       return user;
     }
 
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values({ ...userData, createdAt: now, updatedAt: now })
       .onConflictDoUpdate({
         target: users.id,
         set: {
           ...userData,
-          updatedAt: new Date(),
+          updatedAt: now,
         },
       })
       .returning();
@@ -93,7 +94,7 @@ export class DatabaseStorage implements IStorage {
     const db = await getDb();
     const [newContact] = await db
       .insert(emergencyContacts)
-      .values({ ...contact, id: randomUUID() })
+      .values({ ...contact, id: randomUUID(), createdAt: new Date() })
       .returning();
     return newContact;
   }
@@ -139,9 +140,10 @@ export class DatabaseStorage implements IStorage {
 
   async createCrimeReport(report: InsertCrimeReport): Promise<CrimeReport> {
     const db = await getDb();
+    const now = new Date();
     const [newReport] = await db
       .insert(crimeReports)
-      .values({ ...report, id: randomUUID() })
+      .values({ ...report, id: randomUUID(), createdAt: now, reportedAt: now })
       .returning();
     return newReport;
   }
@@ -151,7 +153,7 @@ export class DatabaseStorage implements IStorage {
     const db = await getDb();
     const [newAlert] = await db
       .insert(sosAlerts)
-      .values({ ...alert, id: randomUUID() })
+      .values({ ...alert, id: randomUUID(), createdAt: new Date() })
       .returning();
     return newAlert;
   }
