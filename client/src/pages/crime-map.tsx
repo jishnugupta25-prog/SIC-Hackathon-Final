@@ -139,6 +139,16 @@ export default function CrimeMap() {
 
     const color = (type: string) => crimeColors[type] || "#6b7280";
 
+    const legendItems = [
+      { type: "Theft", color: crimeColors.Theft },
+      { type: "Burglary", color: crimeColors.Burglary },
+      { type: "Assault", color: crimeColors.Assault },
+      { type: "Robbery", color: crimeColors.Robbery },
+      { type: "Vandalism", color: crimeColors.Vandalism },
+      { type: "Vehicle Theft", color: crimeColors["Vehicle Theft"] },
+      { type: "Other", color: crimeColors.Other },
+    ];
+
     const html = `
       <div style="position: relative; width: 100%; height: 100%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
         <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #e8f4f8 0%, #d4e6eb 100%);"></div>
@@ -155,6 +165,15 @@ export default function CrimeMap() {
             </div>
           `;
         }).join('')}
+        <div style="position: absolute; top: 12px; left: 12px; background: white; padding: 10px 12px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 15; max-height: 350px; overflow-y: auto;">
+          <div style="font-weight: 600; font-size: 13px; margin-bottom: 8px; color: #333;">Crime Types</div>
+          ${legendItems.map((item) => `
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; color: #555;">
+              <div style="width: 16px; height: 16px; background-color: ${item.color}; border: 2px solid ${item.color}; border-radius: 50%; flex-shrink: 0;"></div>
+              <span>${item.type}</span>
+            </div>
+          `).join('')}
+        </div>
         <div style="position: absolute; bottom: 8px; right: 8px; background: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; color: #666; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">© OpenStreetMap</div>
       </div>
     `;
