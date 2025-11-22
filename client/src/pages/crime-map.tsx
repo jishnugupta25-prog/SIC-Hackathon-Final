@@ -2,23 +2,41 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Map, AlertTriangle, Calendar, MapPin, Brain } from "lucide-react";
 import type { CrimeReport } from "@shared/schema";
 
 export default function CrimeMap() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [location, setLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [selectedCrime, setSelectedCrime] = useState<CrimeReport | null>(null);
 
-  const { data: crimes = [], isLoading, isError } = useQuery<CrimeReport[]>({
+  const {
+    data: crimes = [],
+    isLoading,
+    isError,
+  } = useQuery<CrimeReport[]>({
     queryKey: ["/api/crimes"],
     enabled: isAuthenticated,
   });
 
-  const { data: aiInsights, isLoading: aiLoading, isError: aiError } = useQuery<{ analysis: string; recommendations: string[] }>({
+  const {
+    data: aiInsights,
+    isLoading: aiLoading,
+    isError: aiError,
+  } = useQuery<{ analysis: string; recommendations: string[] }>({
     queryKey: ["/api/ai/crime-analysis"],
     enabled: isAuthenticated && crimes.length > 0,
   });
@@ -60,9 +78,13 @@ export default function CrimeMap() {
         setLocation(newLocation);
       },
       (error) => {
-        console.error("Geolocation error for crime map:", error.code, error.message);
+        console.error(
+          "Geolocation error for crime map:",
+          error.code,
+          error.message,
+        );
       },
-      options
+      options,
     );
   }, []);
 
@@ -84,18 +106,29 @@ export default function CrimeMap() {
   const formatDate = (dateString: string | Date | null) => {
     if (!dateString) return "Unknown date";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   };
 
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const calculateDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ) => {
     const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return (R * c).toFixed(1);
   };
 
@@ -116,7 +149,9 @@ export default function CrimeMap() {
         <Card>
           <CardContent className="p-8 text-center">
             <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-3" />
-            <h3 className="text-lg font-semibold mb-2">Failed to Load Crime Data</h3>
+            <h3 className="text-lg font-semibold mb-2">
+              Failed to Load Crime Data
+            </h3>
             <p className="text-sm text-muted-foreground">
               Unable to fetch crime reports. Please try again later.
             </p>
@@ -129,7 +164,9 @@ export default function CrimeMap() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-heading font-bold tracking-tight">Crime Map</h1>
+        <h1 className="text-3xl font-heading font-bold tracking-tight">
+          Crime Map
+        </h1>
         <p className="text-muted-foreground mt-1">
           View reported crimes in your area
         </p>
@@ -140,12 +177,18 @@ export default function CrimeMap() {
         <div className="md:col-span-2 space-y-4">
           <Card>
             <CardContent className="p-6">
-              <div id="crime-map-container" className="bg-muted rounded-md mb-4" style={{ height: "400px" }} />
+              <div
+                id="crime-map-container"
+                className="bg-muted rounded-md mb-4"
+                style={{ height: "400px" }}
+              />
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-primary" />
                   <span className="text-sm">
-                    {location ? `Your Location: ${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}` : "Location unavailable"}
+                    {location
+                      ? `Your Location: ${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`
+                      : "Location unavailable"}
                   </span>
                 </div>
                 <Badge variant="outline">{crimes.length} Reports</Badge>
@@ -156,13 +199,17 @@ export default function CrimeMap() {
           <Card>
             <CardHeader>
               <CardTitle>Recent Crime Reports</CardTitle>
-              <CardDescription>Criminal activity reported in your area</CardDescription>
+              <CardDescription>
+                Criminal activity reported in your area
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {crimes.length === 0 ? (
                 <div className="text-center py-8">
                   <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground">No crime reports in your area</p>
+                  <p className="text-sm text-muted-foreground">
+                    No crime reports in your area
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -173,12 +220,16 @@ export default function CrimeMap() {
                       onClick={() => setSelectedCrime(crime)}
                       data-testid={`crime-item-${crime.id}`}
                     >
-                      <div className={`h-2 w-2 rounded-full mt-2 ${getCrimeTypeColor(crime.crimeType)}`} />
+                      <div
+                        className={`h-2 w-2 rounded-full mt-2 ${getCrimeTypeColor(crime.crimeType)}`}
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-medium">{crime.crimeType}</p>
                           <Badge variant="secondary" className="text-xs">
-                            {location ? `${calculateDistance(location.latitude, location.longitude, crime.latitude, crime.longitude)} km away` : "Distance unknown"}
+                            {location
+                              ? `${calculateDistance(location.latitude, location.longitude, crime.latitude, crime.longitude)} km away`
+                              : "Distance unknown"}
                           </Badge>
                         </div>
                         {crime.description && (
@@ -220,7 +271,9 @@ export default function CrimeMap() {
               {aiLoading ? (
                 <div className="text-center py-4">
                   <div className="h-6 w-6 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p className="text-xs text-muted-foreground mt-2">Analyzing crime patterns...</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Analyzing crime patterns...
+                  </p>
                 </div>
               ) : aiError ? (
                 <p className="text-sm text-muted-foreground">
@@ -230,21 +283,29 @@ export default function CrimeMap() {
                 <div className="space-y-3">
                   <div>
                     <p className="text-sm font-medium mb-1">Pattern Analysis</p>
-                    <p className="text-xs text-muted-foreground">{aiInsights.analysis}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {aiInsights.analysis}
+                    </p>
                   </div>
-                  {aiInsights.recommendations && aiInsights.recommendations.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium mb-2">Recommendations</p>
-                      <ul className="space-y-1">
-                        {aiInsights.recommendations.map((rec, idx) => (
-                          <li key={idx} className="text-xs text-muted-foreground flex items-start gap-2">
-                            <span className="text-primary mt-0.5">•</span>
-                            <span>{rec}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  {aiInsights.recommendations &&
+                    aiInsights.recommendations.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium mb-2">
+                          Recommendations
+                        </p>
+                        <ul className="space-y-1">
+                          {aiInsights.recommendations.map((rec, idx) => (
+                            <li
+                              key={idx}
+                              className="text-xs text-muted-foreground flex items-start gap-2"
+                            >
+                              <span className="text-primary mt-0.5">•</span>
+                              <span>{rec}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -260,24 +321,29 @@ export default function CrimeMap() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-2">
-                {["Theft", "Burglary", "Assault", "Robbery", "Vandalism"].map((type) => {
-                  const count = crimes.filter((c) => c.crimeType === type).length;
-                  const percentage = crimes.length > 0 ? (count / crimes.length) * 100 : 0;
-                  return (
-                    <div key={type} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>{type}</span>
-                        <span className="text-muted-foreground">{count}</span>
+                {["Theft", "Burglary", "Assault", "Robbery", "Vandalism"].map(
+                  (type) => {
+                    const count = crimes.filter(
+                      (c) => c.crimeType === type,
+                    ).length;
+                    const percentage =
+                      crimes.length > 0 ? (count / crimes.length) * 100 : 0;
+                    return (
+                      <div key={type} className="space-y-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>{type}</span>
+                          <span className="text-muted-foreground">{count}</span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${getCrimeTypeColor(type)}`}
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${getCrimeTypeColor(type)}`}
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  },
+                )}
               </div>
             </CardContent>
           </Card>
@@ -287,13 +353,23 @@ export default function CrimeMap() {
               <CardTitle className="text-lg">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button asChild variant="outline" className="w-full" data-testid="button-report-crime">
+              <Button
+                asChild
+                variant="outline"
+                className="w-full"
+                data-testid="button-report-crime"
+              >
                 <a href="/report-crime">
                   <AlertTriangle className="h-4 w-4 mr-2" />
                   Report a Crime
                 </a>
               </Button>
-              <Button asChild variant="outline" className="w-full" data-testid="button-safe-places">
+              <Button
+                asChild
+                variant="outline"
+                className="w-full"
+                data-testid="button-safe-places"
+              >
                 <a href="/safe-places">
                   <MapPin className="h-4 w-4 mr-2" />
                   Find Safe Places
