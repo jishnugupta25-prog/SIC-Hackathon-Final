@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Map, AlertTriangle, Calendar, MapPin, Brain } from "lucide-react";
 import type { CrimeReport } from "@shared/schema";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 export default function CrimeMap() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
@@ -87,6 +89,56 @@ export default function CrimeMap() {
       options,
     );
   }, []);
+
+  useEffect(() => {
+    const container = document.getElementById("crime-map-container");
+    if (!container || !location) return;
+
+    // Create map centered on user location
+    const map = L.map(container).setView(
+      [location.latitude, location.longitude],
+      12,
+    );
+
+    // Add OpenStreetMap tiles
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+    }).addTo(map);
+
+    // Add user location marker (blue)
+    L.circleMarker([location.latitude, location.longitude], {
+      radius: 8,
+      fillColor: "#3b82f6",
+      color: "#1e40af",
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.8,
+    })
+      .bindPopup("Your Location")
+      .addTo(map);
+
+    // Add crime markers (red)
+    crimes.forEach((crime) => {
+      L.circleMarker([crime.latitude, crime.longitude], {
+        radius: 6,
+        fillColor: "#ef4444",
+        color: "#dc2626",
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.7,
+      })
+        .bindPopup(
+          `<strong>${crime.crimeType}</strong><br/>${crime.description || "No description"}<br/><small>${formatDate(crime.reportedAt)}</small>`,
+        )
+        .addTo(map);
+    });
+
+    return () => {
+      map.remove();
+    };
+  }, [location, crimes]);
 
   const getCrimeTypeColor = (type: string) => {
     const colors: Record<string, string> = {
