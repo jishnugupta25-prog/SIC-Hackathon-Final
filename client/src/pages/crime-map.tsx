@@ -1,18 +1,15 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Map, AlertTriangle, Calendar, MapPin, Brain } from "lucide-react";
 import type { CrimeReport } from "@shared/schema";
 
 export default function CrimeMap() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const mapRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedCrime, setSelectedCrime] = useState<CrimeReport | null>(null);
 
@@ -26,7 +23,6 @@ export default function CrimeMap() {
     enabled: isAuthenticated && crimes.length > 0,
   });
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       toast({
@@ -40,7 +36,6 @@ export default function CrimeMap() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  // Get current location with improved accuracy and logging
   useEffect(() => {
     if (!navigator.geolocation) {
       console.warn("Geolocation not available");
@@ -69,18 +64,6 @@ export default function CrimeMap() {
       },
       options
     );
-  }, []);
-
-  // Load Google Maps script once
-  useEffect(() => {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    if (!apiKey || window.google) return;
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
   }, []);
 
   const getCrimeTypeColor = (type: string) => {
@@ -126,72 +109,6 @@ export default function CrimeMap() {
       </div>
     );
   }
-
-  // Initialize and update map with crime markers
-  useEffect(() => {
-    if (!window.google || !mapRef.current || crimes.length === 0) return;
-
-    const mapElement = document.getElementById("crime-map-container");
-    if (!mapElement) return;
-
-    // Clear existing markers
-    markersRef.current.forEach((marker: any) => marker.setMap(null));
-    markersRef.current = [];
-
-    // Calculate bounds to fit all crimes
-    const bounds = new (window as any).google.maps.LatLngBounds();
-    
-    crimes.forEach((crime) => {
-      const position = { lat: crime.latitude, lng: crime.longitude };
-      bounds.extend(position);
-
-      const marker = new (window as any).google.maps.Marker({
-        position,
-        map: mapRef.current,
-        title: crime.crimeType,
-        icon: {
-          path: (window as any).google.maps.SymbolPath.CIRCLE,
-          scale: 8,
-          fillColor: crime.crimeType === "Assault" || crime.crimeType === "Harassment" ? "#ef4444" : 
-                     crime.crimeType === "Robbery" ? "#f97316" :
-                     crime.crimeType === "Burglary" ? "#a855f7" :
-                     crime.crimeType === "Vehicle Theft" ? "#06b6d4" : "#eab308",
-          fillOpacity: 0.8,
-          strokeColor: "#ffffff",
-          strokeWeight: 2,
-        }
-      });
-
-      marker.addListener("click", () => setSelectedCrime(crime));
-      markersRef.current.push(marker);
-    });
-
-    // Fit map to bounds
-    if (markersRef.current.length > 0) {
-      mapRef.current.fitBounds(bounds);
-    } else if (location) {
-      mapRef.current.setCenter({ lat: location.latitude, lng: location.longitude });
-      mapRef.current.setZoom(12);
-    }
-  }, [crimes, location]);
-
-  // Initialize map on first load
-  useEffect(() => {
-    if (!window.google) return;
-
-    const mapElement = document.getElementById("crime-map-container");
-    if (!mapElement || mapRef.current) return;
-
-    const defaultLocation = location || { latitude: 20.5937, longitude: 78.9629 };
-    
-    mapRef.current = new (window as any).google.maps.Map(mapElement, {
-      zoom: 12,
-      center: { lat: defaultLocation.latitude, lng: defaultLocation.longitude },
-      mapTypeControl: true,
-      fullscreenControl: true,
-      zoomControl: true,
-    });
-  }, [location]);
 
   if (isError) {
     return (
