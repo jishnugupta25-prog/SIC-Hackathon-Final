@@ -7,6 +7,7 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
+import MemoryStore from "memorystore";
 import { storage } from "./storage";
 
 const getOidcConfig = memoize(
@@ -21,13 +22,27 @@ const getOidcConfig = memoize(
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
+  
+  let sessionStore: any;
+  
+  if (process.env.DATABASE_URL) {
+    // Use PostgreSQL session store
+    const pgStore = connectPg(session);
+    sessionStore = new pgStore({
+      conString: process.env.DATABASE_URL,
+      createTableIfMissing: false,
+      ttl: sessionTtl,
+      tableName: "sessions",
+    });
+  } else {
+    // Use in-memory session store for development/SQLite
+    const memoryStore = MemoryStore(session);
+    sessionStore = new memoryStore({
+      checkPeriod: 86400000, // prune expired entries every 24h
+      ttl: sessionTtl,
+    });
+  }
+  
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
@@ -35,7 +50,7 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === 'production',
       maxAge: sessionTtl,
     },
   });
@@ -68,6 +83,15 @@ export async function setupAuth(app: Express) {
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
+
+  // Passport serialization for email/password auth
+  passport.serializeUser((user: any, done) => {
+    done(null, user);
+  });
+
+  passport.deserializeUser((user: any, done) => {
+    done(null, user);
+  });
 
   // Test login endpoint (for development/testing only)
   app.get('/api/test-login', async (req: any, res) => {
@@ -176,42 +200,12 @@ export async function setupAuth(app: Express) {
       });
     });
   }
-
-  passport.serializeUser((user: Express.User, cb) => cb(null, user));
-  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 }
 
-export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
-
-  if (!req.isAuthenticated() || !user.expires_at) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) {
+export const isAuthenticated = ((req: any, res: any, next: any) => {
+  if (req.isAuthenticated && req.isAuthenticated()) {
     return next();
   }
 
-  const refreshToken = user.refresh_token;
-  if (!refreshToken) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
-  }
-
-  // Only attempt token refresh for Replit OAuth (access_token is 'email-auth' for email/password)
-  if (refreshToken === 'email-auth') {
-    // Email/password sessions don't need refresh, just check expiry
-    return next();
-  }
-
-  try {
-    const config = await getOidcConfig();
-    const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
-    updateUserSession(user, tokenResponse);
-    return next();
-  } catch (error) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
-  }
-};
+  return res.status(401).json({ message: "Unauthorized" });
+}) as RequestHandler;

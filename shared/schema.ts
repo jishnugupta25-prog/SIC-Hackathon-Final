@@ -112,7 +112,7 @@ export const sosAlerts = pgTable("sos_alerts", {
 export const sosAlertsRelations = relations(sosAlerts, ({ one }) => ({
   user: one(users, {
     fields: [sosAlerts.userId],
-    references: [sosAlerts.id],
+    references: [users.id],
   }),
 }));
 
