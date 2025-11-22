@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { queryClient } from '@/lib/queryClient';
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -42,6 +43,10 @@ export default function Login() {
         const error = await response.json();
         throw new Error(error.message);
       }
+
+      // Invalidate admin sessions cache to update dashboard immediately
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/reports"] });
 
       toast({ title: 'Success', description: 'Logged in! Redirecting...' });
       setTimeout(() => {
