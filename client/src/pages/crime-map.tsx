@@ -105,7 +105,9 @@ export default function CrimeMap() {
       Other: "#6b7280",
     };
 
-    const positions = crimes.map((crime, idx) => {
+    const positions: Array<{ x: number; y: number; crime: CrimeReport; idx: number }> = [];
+
+    crimes.forEach((crime, idx) => {
       const offsetLat = (crime.latitude - location.latitude) * 1000;
       const offsetLon = (crime.longitude - location.longitude) * 1000;
       let x = 50 + (offsetLon / 1000) * 25;
@@ -116,7 +118,7 @@ export default function CrimeMap() {
       let attempt = 0;
       while (collisionFound && attempt < 8) {
         collisionFound = false;
-        for (let j = 0; j < idx; j++) {
+        for (let j = 0; j < positions.length; j++) {
           const otherPos = positions[j];
           const dist = Math.sqrt(
             Math.pow(x - otherPos.x, 2) + Math.pow(y - otherPos.y, 2),
@@ -132,7 +134,7 @@ export default function CrimeMap() {
         attempt++;
       }
 
-      return { x: Math.max(8, Math.min(92, x)), y: Math.max(8, Math.min(92, y)), crime, idx };
+      positions.push({ x: Math.max(8, Math.min(92, x)), y: Math.max(8, Math.min(92, y)), crime, idx });
     });
 
     const color = (type: string) => crimeColors[type] || "#6b7280";
