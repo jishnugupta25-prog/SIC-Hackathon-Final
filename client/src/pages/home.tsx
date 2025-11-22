@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, MapPin, Users, Shield, AlertCircle } from "lucide-react";
+import crimeDashboardImg from "@assets/generated_images/crime_dashboard_ui_concept.png";
+import protectionShieldImg from "@assets/generated_images/protection_shield_badge.png";
 import type { EmergencyContact, CrimeReport } from "@shared/schema";
 import {
   AlertDialog,
@@ -188,6 +190,14 @@ export default function Home() {
 
   return (
     <div className="space-y-6 relative">
+      {/* Decorative background images */}
+      <div className="fixed bottom-0 right-0 opacity-5 pointer-events-none z-0 max-w-sm">
+        <img src={crimeDashboardImg} alt="" className="w-full h-auto" />
+      </div>
+      <div className="fixed top-32 left-4 opacity-8 pointer-events-none z-0 max-w-xs">
+        <img src={protectionShieldImg} alt="" className="w-24 h-24" />
+      </div>
+
       {/* Emergency Helpline */}
       <div className="fixed top-4 right-4 z-40 md:top-6 md:right-6">
         <a 
@@ -205,7 +215,7 @@ export default function Home() {
       </div>
 
       {/* Welcome Header */}
-      <div>
+      <div className="relative z-10">
         <h1 className="text-3xl md:text-4xl font-heading font-bold tracking-tight">
           Welcome back, {user?.firstName || "User"}
         </h1>
@@ -215,7 +225,7 @@ export default function Home() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 relative z-10">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Emergency Contacts</CardTitle>
@@ -264,7 +274,7 @@ export default function Home() {
       </div>
 
       {/* SOS Button Section */}
-      <Card className="border-destructive/50">
+      <Card className="border-destructive/50 relative z-10">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-destructive" />
@@ -304,7 +314,7 @@ export default function Home() {
       </Card>
 
       {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 relative z-10">
         <Card className="hover-elevate cursor-pointer" data-testid="card-quick-report">
           <CardHeader>
             <CardTitle className="text-lg">Report a Crime</CardTitle>
