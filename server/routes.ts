@@ -323,7 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return R * c; // Distance in kilometers
   };
 
-  // Get location suggestions as user types (worldwide search) with retry
+  // Get location suggestions using Google Maps Geocoding API
   app.get('/api/suggestions', isAuthenticated, async (req: any, res) => {
     try {
       const query = req.query.q as string;
@@ -331,100 +331,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json([]);
       }
 
-      // Helper function to fetch with retry
-      const fetchWithRetry = async (maxRetries: number = 2): Promise<any> => {
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8`;
-            
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout per attempt
-            
-            const response = await fetch(url, {
-              headers: {
-                'User-Agent': 'CrimeReportPortal/1.0',
-                'Accept': 'application/json'
-              },
-              signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-              console.warn(`[Suggestions] Attempt ${attempt}: HTTP ${response.status}`);
-              if (attempt < maxRetries) {
-                await new Promise(r => setTimeout(r, 200));
-                continue;
-              }
-              throw new Error(`HTTP ${response.status}`);
-            }
-
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-              console.warn(`[Suggestions] Attempt ${attempt}: Invalid content type`, contentType);
-              if (attempt < maxRetries) {
-                await new Promise(r => setTimeout(r, 200));
-                continue;
-              }
-              throw new Error("Invalid content type");
-            }
-
-            const data = await response.json();
-            if (!Array.isArray(data)) {
-              console.warn(`[Suggestions] Attempt ${attempt}: Response not an array`);
-              if (attempt < maxRetries) {
-                await new Promise(r => setTimeout(r, 200));
-                continue;
-              }
-              throw new Error("Invalid response format");
-            }
-
-            console.log(`[Suggestions] ✓ Success on attempt ${attempt}: Found ${data.length} results for "${query}"`);
-            return data;
-          } catch (error: any) {
-            console.warn(`[Suggestions] Attempt ${attempt} error:`, error.message);
-            if (attempt === maxRetries) {
-              throw error;
-            }
-            await new Promise(r => setTimeout(r, 200));
-          }
-        }
-        throw new Error("All retries failed");
-      };
-
-      let data;
-      try {
-        data = await fetchWithRetry(2);
-      } catch (error: any) {
-        console.warn("[Suggestions] All attempts failed:", error.message);
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        console.warn("[Suggestions] Google Maps API key not configured");
         return res.json([]);
       }
 
-      const suggestions = data.map((item: any) => {
-        try {
-          const lat = parseFloat(item.lat);
-          const lon = parseFloat(item.lon);
-          if (isNaN(lat) || isNaN(lon)) return null;
-          
-          return {
-            displayName: item.display_name || 'Unknown',
-            latitude: lat,
-            longitude: lon
-          };
-        } catch {
-          return null;
-        }
-      }).filter(Boolean);
+      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${apiKey}&components=country:in`;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(url, {
+        signal: controller.signal
+      });
 
-      console.log(`[Suggestions] Found ${suggestions.length} valid results for "${query}"`);
-      res.json(suggestions);
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn(`[Suggestions] HTTP ${response.status}`);
+        return res.json([]);
+      }
+
+      const data = await response.json();
+      if (data.status !== 'OK' || !Array.isArray(data.predictions)) {
+        console.warn(`[Suggestions] API error: ${data.status}`);
+        return res.json([]);
+      }
+
+      // Get detailed location for each prediction
+      const suggestions = await Promise.all(
+        data.predictions.slice(0, 8).map(async (prediction: any) => {
+          try {
+            const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.place_id}&fields=geometry&key=${apiKey}`;
+            const detailResponse = await fetch(detailUrl, { signal: AbortSignal.timeout(3000) });
+            
+            if (!detailResponse.ok) return null;
+            
+            const detailData = await detailResponse.json();
+            if (detailData.status !== 'OK' || !detailData.result?.geometry?.location) {
+              return null;
+            }
+
+            return {
+              displayName: prediction.description,
+              latitude: detailData.result.geometry.location.lat,
+              longitude: detailData.result.geometry.location.lng
+            };
+          } catch (error) {
+            console.warn("[Suggestions] Error getting details:", error);
+            return null;
+          }
+        })
+      );
+
+      const validSuggestions = suggestions.filter(Boolean);
+      console.log(`[Suggestions] Found ${validSuggestions.length} results for "${query}"`);
+      res.json(validSuggestions);
     } catch (error: any) {
-      console.error("[Suggestions] Unexpected error:", error.message);
+      console.error("[Suggestions] Error:", error.message);
       res.json([]);
     }
   });
 
-  // Reverse geocode - get place name from coordinates with retry
+  // Reverse geocode - get place name from coordinates using Google Maps
   app.get('/api/reverse-geocode', isAuthenticated, async (req: any, res) => {
     try {
       const lat = req.query.lat as string;
@@ -441,165 +411,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid coordinates" });
       }
 
-      // Helper function to fetch with retry
-      const fetchWithRetry = async (maxRetries: number = 2): Promise<any> => {
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`;
-            
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 second timeout per attempt
-            
-            const response = await fetch(url, {
-              headers: {
-                'User-Agent': 'CrimeReportPortal/1.0',
-                'Accept': 'application/json'
-              },
-              signal: controller.signal
-            });
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        console.warn("[Reverse Geocode] Google Maps API key not configured");
+        return res.json({ placeName: "My Location", hierarchy: [] });
+      }
 
-            clearTimeout(timeoutId);
+      console.log(`[Reverse Geocode] Calling Google Maps for: ${numLat},${numLon}`);
 
-            if (!response.ok) {
-              console.warn(`[Reverse Geocode] Attempt ${attempt}: HTTP ${response.status}`);
-              if (attempt < maxRetries) {
-                await new Promise(r => setTimeout(r, 300)); // Wait before retry
-                continue;
-              }
-              throw new Error(`HTTP ${response.status}`);
-            }
-
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-              console.warn(`[Reverse Geocode] Attempt ${attempt}: Invalid content type`, contentType);
-              if (attempt < maxRetries) {
-                await new Promise(r => setTimeout(r, 300)); // Wait before retry
-                continue;
-              }
-              throw new Error("Invalid content type");
-            }
-
-            const data = await response.json();
-            
-            if (!data || !data.display_name) {
-              console.warn(`[Reverse Geocode] Attempt ${attempt}: Empty or invalid data`);
-              if (attempt < maxRetries) {
-                await new Promise(r => setTimeout(r, 300)); // Wait before retry
-                continue;
-              }
-              throw new Error("Empty response");
-            }
-
-            console.log(`[Reverse Geocode] ✓ Success on attempt ${attempt}: ${lat}, ${lon}`);
-            return data;
-          } catch (error: any) {
-            console.warn(`[Reverse Geocode] Attempt ${attempt} error:`, error.message);
-            if (attempt === maxRetries) {
-              throw error;
-            }
-            await new Promise(r => setTimeout(r, 300));
-          }
-        }
-        throw new Error("All retries failed");
-      };
-
-      let data;
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${numLat},${numLon}&key=${apiKey}`;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      
+      let response, data;
       try {
-        data = await fetchWithRetry(2);
-      } catch (error: any) {
-        console.warn("[Reverse Geocode] All attempts failed, using fallback:", error.message);
-        // Return fallback with exact coordinates
-        const placeName = `Location (${lat}, ${lon})`;
-        console.log(`[Reverse Geocode] Fallback: ${placeName}`);
-        return res.json({ 
-          placeName: placeName, 
-          hierarchy: [],
-          isFallback: true,
-          latitude: numLat,
-          longitude: numLon
+        response = await fetch(url, {
+          signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          console.warn(`[Reverse Geocode] HTTP ${response.status}`);
+          return res.json({ placeName: "My Location", hierarchy: [] });
+        }
+
+        data = await response.json();
+        console.log(`[Reverse Geocode] Google Maps response status: ${data.status}`);
+      } catch (fetchError: any) {
+        console.error(`[Reverse Geocode] Fetch error: ${fetchError.message}`);
+        clearTimeout(timeoutId);
+        return res.json({ placeName: "My Location", hierarchy: [] });
+      }
+      
+      if (data.status !== 'OK' || !data.results || data.results.length === 0) {
+        console.warn(`[Reverse Geocode] API error: ${data.status}. Results: ${data.results?.length || 0}`);
+        return res.json({ placeName: "My Location", hierarchy: [] });
       }
 
-      const address = data.address || {};
-      const displayName = data.display_name || "";
+      const result = data.results[0];
+      const placeName = result.formatted_address || result.address_components?.[0]?.long_name || "My Location";
+      console.log(`[Reverse Geocode] ✓ Success: ${numLat},${numLon} -> ${placeName}`);
       
-      // Strategy: Extract most relevant location name
-      let placeName = "";
+      // Extract address components
+      const addressComponents = result.address_components || [];
+      const hierarchy: string[] = [];
       
-      // Step 1: Try address components in priority order
-      const addressCandidate = 
-        address.suburb ||           // Most specific: suburb/locality
-        address.neighbourhood ||    // Neighborhood
-        address.town ||             // Town level
-        address.hamlet ||           // Hamlet/small area
-        address.village ||          // Village
-        address.district ||         // District level
-        address.city;               // City (fallback from address components)
-      
-      // Step 2: If we have a good address component, use it
-      if (addressCandidate && addressCandidate.length > 1) {
-        placeName = addressCandidate;
-        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (from address components)`);
-      } else if (displayName && displayName.length > 0) {
-        // Step 3: Parse display_name carefully if address components aren't good
-        const displayParts = displayName.split(",").map((p: string) => p.trim()).filter(Boolean);
-        
-        if (displayParts.length > 0) {
-          // Try to find first non-generic part
-          const genericTerms = ["India", "Country", address.state, address.country];
-          let bestPart = displayParts[0]; // Default to first part
-          
-          // Find first meaningful (non-generic) part
-          for (const part of displayParts) {
-            if (part && part.length > 2 && !genericTerms.includes(part)) {
-              bestPart = part;
-              break;
-            }
-          }
-          
-          placeName = bestPart;
-          console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (from display_name: ${displayName})`);
+      // Build hierarchy: village/city -> district -> state -> country
+      const componentMap: Record<string, string> = {};
+      for (const component of addressComponents) {
+        const types = component.types || [];
+        if (types.includes('locality') || types.includes('administrative_area_level_3')) {
+          componentMap.locality = component.long_name;
+        } else if (types.includes('administrative_area_level_2')) {
+          componentMap.district = component.long_name;
+        } else if (types.includes('administrative_area_level_1')) {
+          componentMap.state = component.long_name;
+        } else if (types.includes('country')) {
+          componentMap.country = component.long_name;
         }
       }
-      
-      // Step 4: Final fallback - use city or state
-      if (!placeName || placeName.length < 1) {
-        placeName = address.city || address.state || address.country || "Unknown Location";
-        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (fallback)`);
-      }
-      
-      // Build complete address hierarchy for display
-      const hierarchy = {
-        suburb: address.suburb,
-        town: address.town,
-        hamlet: address.hamlet,
-        village: address.village,
-        district: address.district,
-        city: address.city,
-        county: address.county,
-        state: address.state,
-        country: address.country
-      };
-      
-      // Filter out empty values and create hierarchy array
-      const hierarchyArray = Object.entries(hierarchy)
-        .filter(([_, value]) => value && value.length > 0)
-        .map(([_, value]) => value);
-      
+
+      if (componentMap.locality) hierarchy.push(componentMap.locality);
+      if (componentMap.district) hierarchy.push(componentMap.district);
+      if (componentMap.state) hierarchy.push(componentMap.state);
+      if (componentMap.country) hierarchy.push(componentMap.country);
+
+      console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName}`);
       res.json({
         placeName: placeName,
-        displayName: data.display_name,
-        address: data.address,
-        hierarchy: hierarchyArray,
-        fullHierarchy: hierarchy
+        hierarchy: hierarchy,
+        latitude: numLat,
+        longitude: numLon
       });
     } catch (error: any) {
       console.error("[Reverse Geocode] Error:", error.message);
-      res.json({ placeName: "Unknown Location" });
+      res.json({ placeName: "My Location", hierarchy: [] });
     }
   });
 
-  // Geocode place name to coordinates with retry
+  // Geocode place name to coordinates using Google Maps
   app.get('/api/geocode', isAuthenticated, async (req: any, res) => {
     try {
       const placeName = req.query.place as string;
@@ -609,87 +501,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[Geocode] Searching for: ${placeName}`);
 
-      // Helper function to fetch with retry
-      const fetchWithRetry = async (maxRetries: number = 2): Promise<any> => {
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(placeName)}&format=json&limit=1`;
-            
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 second timeout per attempt
-            
-            const response = await fetch(url, {
-              headers: {
-                'User-Agent': 'CrimeReportPortal/1.0',
-                'Accept': 'application/json'
-              },
-              signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-              console.warn(`[Geocode] Attempt ${attempt}: HTTP ${response.status}`);
-              if (attempt < maxRetries) {
-                await new Promise(r => setTimeout(r, 300));
-                continue;
-              }
-              throw new Error(`HTTP ${response.status}`);
-            }
-
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-              console.warn(`[Geocode] Attempt ${attempt}: Invalid content type`, contentType);
-              if (attempt < maxRetries) {
-                await new Promise(r => setTimeout(r, 300));
-                continue;
-              }
-              throw new Error("Invalid content type");
-            }
-
-            const data = await response.json();
-            
-            if (!Array.isArray(data)) {
-              console.warn(`[Geocode] Attempt ${attempt}: Response not an array`);
-              if (attempt < maxRetries) {
-                await new Promise(r => setTimeout(r, 300));
-                continue;
-              }
-              throw new Error("Invalid response format");
-            }
-
-            console.log(`[Geocode] ✓ Success on attempt ${attempt}: Found ${data.length} results`);
-            return data;
-          } catch (error: any) {
-            console.warn(`[Geocode] Attempt ${attempt} error:`, error.message);
-            if (attempt === maxRetries) {
-              throw error;
-            }
-            await new Promise(r => setTimeout(r, 300));
-          }
-        }
-        throw new Error("All retries failed");
-      };
-
-      let data;
-      try {
-        data = await fetchWithRetry(2);
-      } catch (error: any) {
-        console.error("[Geocode] All attempts failed:", error.message);
-        return res.status(500).json({ message: "Geocoding service unavailable. Please try again." });
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        console.warn("[Geocode] Google Maps API key not configured");
+        return res.status(500).json({ message: "Location service unavailable" });
       }
 
-      if (!data || !Array.isArray(data) || data.length === 0) {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(placeName)}&key=${apiKey}`;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      
+      const response = await fetch(url, {
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn(`[Geocode] HTTP ${response.status}`);
+        return res.status(500).json({ message: "Geocoding service unavailable" });
+      }
+
+      const data = await response.json();
+      
+      if (data.status !== 'OK' || !data.results || data.results.length === 0) {
         console.log(`[Geocode] No results found for: ${placeName}`);
         return res.status(404).json({ message: `No location found for "${placeName}". Try a larger city or region.` });
       }
 
-      const location = data[0];
-      console.log(`[Geocode] Found: ${location.display_name}`);
+      const location = data.results[0];
+      const displayName = location.formatted_address;
+      
+      console.log(`[Geocode] Found: ${displayName}`);
       res.json({
-        latitude: parseFloat(location.lat),
-        longitude: parseFloat(location.lon),
-        displayName: location.display_name
+        latitude: location.geometry.location.lat,
+        longitude: location.geometry.location.lng,
+        displayName: displayName
       });
     } catch (error: any) {
       console.error("[Geocode] Error:", error.message);
@@ -787,7 +635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Safe Places route - fast parallel fetching with priority sorting
+  // Safe Places route using Google Places Nearby Search
   app.get('/api/safe-places', isAuthenticated, async (req: any, res) => {
     try {
       const startTime = Date.now();
@@ -801,169 +649,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Safe Places] Fetching locations for: ${userLat}, ${userLon}`);
       
-      // Priority-ordered search types (POLICE FIRST, then HOSPITAL, then PHARMACY, then rest)
-      const searchTypes = [
-        // Police stations - HIGHEST PRIORITY (fetched first) - MAXIMUM coverage
-        { amenities: ["police", "fire_station", "ambulance_station", "police_station"], type: "police", radius: 0.2, priority: 1 },
-        // Hospitals - SECOND PRIORITY
-        { amenities: ["hospital", "clinic", "emergency_ward", "medical", "health"], type: "hospital", radius: 0.2, priority: 2 },
-        // Pharmacies - THIRD PRIORITY
-        { amenities: ["pharmacy", "chemist", "medicine_shop", "drugstore"], type: "pharmacy", radius: 0.2, priority: 3 },
-        // Safe zones - LOWEST PRIORITY
-        { amenities: ["community_centre", "community_center", "shelter", "public_building", "civic_center"], type: "safe_zone", radius: 0.2, priority: 4 },
-      ];
-
-      // Helper function to fetch with timeout and retry
-      const fetchWithRetry = async (url: string, amenity: string, maxRetries: number = 2): Promise<any[]> => {
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-            
-            const response = await fetch(url, {
-              headers: { 'User-Agent': 'CrimeReportPortal/1.0' },
-              signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-              console.warn(`[Safe Places] API returned status ${response.status} for ${amenity}`);
-              return [];
-            }
-            
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-              console.warn(`[Safe Places] Invalid content type for ${amenity}`);
-              return [];
-            }
-
-            const data = await response.json();
-            if (!Array.isArray(data)) {
-              console.warn(`[Safe Places] Response not an array for ${amenity}`);
-              return [];
-            }
-
-            return data;
-          } catch (error: any) {
-            if (attempt < maxRetries && error.name !== 'AbortError') {
-              console.warn(`[Safe Places] Attempt ${attempt} failed for ${amenity}, retrying...`);
-              await new Promise(r => setTimeout(r, 500)); // Wait before retry
-            } else {
-              console.warn(`[Safe Places] Failed to fetch ${amenity} after ${attempt} attempts:`, error.message);
-              return [];
-            }
-          }
-        }
-        return [];
-      };
-
-      // Create all fetch promises in parallel (NO SEQUENTIAL DELAYS)
-      const allFetchPromises: Promise<any[]>[] = [];
-
-      for (const searchType of searchTypes) {
-        for (const amenity of searchType.amenities) {
-          const fetchPromise = (async () => {
-            try {
-              const bbox = `${userLon - searchType.radius},${userLat - searchType.radius},${userLon + searchType.radius},${userLat + searchType.radius}`;
-              const url = `https://nominatim.openstreetmap.org/search?q=[${amenity}]&viewbox=${bbox}&bounded=1&format=json&limit=150&addressdetails=1`;
-              
-              const locations = await fetchWithRetry(url, amenity);
-
-              return locations.map((location: any) => {
-                try {
-                  const lat = parseFloat(location.lat);
-                  const lon = parseFloat(location.lon);
-                  
-                  if (isNaN(lat) || isNaN(lon)) return null;
-                  
-                  const distance = calculateDistance(userLat, userLon, lat, lon);
-                  
-                  // Extract phone number from multiple sources
-                  let phone = location.address?.phone || location.phone || location.extratags?.phone || '';
-                  
-                  // Determine name from various sources
-                  let name = location.name || 
-                    location.display_name?.split(',')[0] || 
-                    location.address?.name ||
-                    'Unknown Location';
-                  
-                  if (!name || name.length < 2 || name === 'Unknown Location') return null;
-                  
-                  return {
-                    id: `${searchType.type}-${Math.round(lat * 10000)}-${Math.round(lon * 10000)}`,
-                    name: name.trim(),
-                    type: searchType.type,
-                    latitude: lat,
-                    longitude: lon,
-                    address: location.display_name || 'No address available',
-                    phone: phone.trim(),
-                    distance: Math.round(distance * 1000) / 1000,
-                    priority: searchType.priority,
-                  };
-                } catch (itemError) {
-                  console.warn(`[Safe Places] Error processing location:`, itemError);
-                  return null;
-                }
-              }).filter(Boolean);
-            } catch (error) {
-              console.warn(`[Safe Places] Error in fetch promise for ${amenity}:`, error);
-              return [];
-            }
-          })();
-          
-          allFetchPromises.push(fetchPromise);
-        }
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        console.warn("[Safe Places] Google Maps API key not configured");
+        return res.json([]);
       }
 
-      // Execute ALL fetches in parallel (fast!)
-      const results = await Promise.all(allFetchPromises.map(p => p.catch(e => {
-        console.warn(`[Safe Places] Promise rejection:`, e);
-        return [];
-      })));
-      const allPlaces = results.flat().filter(Boolean);
+      // Priority-ordered search types
+      const searchTypes = [
+        { keyword: "police station", type: "police", priority: 1 },
+        { keyword: "hospital", type: "hospital", priority: 2 },
+        { keyword: "pharmacy", type: "pharmacy", priority: 3 },
+      ];
+
+      const radius = 5000; // 5km search radius
+      const safePlaces: any[] = [];
+      const seenPlaces = new Set<string>();
+
+      // Fetch nearby places for each type
+      const fetchPromises = searchTypes.map(async (searchType) => {
+        try {
+          const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${userLat},${userLon}&radius=${radius}&keyword=${encodeURIComponent(searchType.keyword)}&key=${apiKey}`;
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+          
+          const response = await fetch(url, {
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            console.warn(`[Safe Places] HTTP ${response.status} for ${searchType.keyword}`);
+            return [];
+          }
+
+          const data = await response.json();
+          
+          if (data.status !== 'OK' || !Array.isArray(data.results)) {
+            console.warn(`[Safe Places] API error for ${searchType.keyword}: ${data.status}`);
+            return [];
+          }
+
+          return data.results.map((place: any) => {
+            const placeId = place.place_id;
+            
+            // Skip duplicates
+            if (seenPlaces.has(placeId)) return null;
+            seenPlaces.add(placeId);
+
+            const distance = calculateDistance(userLat, userLon, place.geometry.location.lat, place.geometry.location.lng);
+
+            return {
+              id: placeId,
+              name: place.name,
+              type: searchType.type,
+              latitude: place.geometry.location.lat,
+              longitude: place.geometry.location.lng,
+              address: place.vicinity || place.formatted_address || "No address available",
+              phone: place.formatted_phone_number || place.international_phone_number || "",
+              distance: Math.round(distance * 1000) / 1000,
+              priority: searchType.priority,
+              rating: place.rating || 0,
+              isOpen: place.opening_hours?.open_now
+            };
+          }).filter(Boolean);
+        } catch (error: any) {
+          console.warn(`[Safe Places] Error fetching ${searchType.keyword}:`, error.message);
+          return [];
+        }
+      });
+
+      // Execute all fetches in parallel
+      const results = await Promise.all(fetchPromises);
+      const allPlaces = results.flat();
 
       if (!allPlaces || allPlaces.length === 0) {
         console.warn(`[Safe Places] No locations found for ${userLat}, ${userLon}`);
         return res.json([]);
       }
 
-      // Remove duplicates using coordinate-based deduplication
-      const seenLocations = new Map<string, any>();
-
-      for (const place of allPlaces) {
-        if (!place || typeof place !== 'object') continue;
-        
-        const locKey = `${Math.round(place.latitude * 100)},${Math.round(place.longitude * 100)}`;
-        
-        if (!seenLocations.has(locKey)) {
-          seenLocations.set(locKey, place);
-        } else {
-          const existing = seenLocations.get(locKey);
-          // Keep the one with higher priority or with phone number
-          if (place.priority < existing.priority || (place.priority === existing.priority && place.phone && !existing.phone)) {
-            seenLocations.set(locKey, place);
-          }
+      // Sort by priority, then distance
+      allPlaces.sort((a, b) => {
+        if (a.priority !== b.priority) {
+          return a.priority - b.priority;
         }
-      }
-
-      // PRIORITY SORTING: Police first, then Hospital, then Pharmacy, then rest
-      // Within each priority, sort by distance (closest first)
-      const safePlaces = Array.from(seenLocations.values())
-        .sort((a, b) => {
-          // First sort by priority (lower priority number = higher importance)
-          if (a.priority !== b.priority) {
-            return a.priority - b.priority;
-          }
-          // Then sort by distance (closest first)
-          return a.distance - b.distance;
-        })
-        .slice(0, 500); // Return all nearby places - comprehensive coverage
+        return a.distance - b.distance;
+      });
 
       const fetchTime = Date.now() - startTime;
-      console.log(`[Safe Places] ⚡ Fetched ${safePlaces.length} places in ${fetchTime}ms. Police: ${safePlaces.filter(p => p.type === 'police').length}, Hospital: ${safePlaces.filter(p => p.type === 'hospital').length}, Pharmacy: ${safePlaces.filter(p => p.type === 'pharmacy').length}, With phones: ${safePlaces.filter(p => p.phone).length}`);
+      console.log(`[Safe Places] ⚡ Fetched ${allPlaces.length} places in ${fetchTime}ms. Police: ${allPlaces.filter(p => p.type === 'police').length}, Hospital: ${allPlaces.filter(p => p.type === 'hospital').length}, Pharmacy: ${allPlaces.filter(p => p.type === 'pharmacy').length}, With phones: ${allPlaces.filter(p => p.phone).length}`);
 
-      res.json(safePlaces);
+      res.json(allPlaces);
     } catch (error) {
       console.error("Error fetching safe places:", error);
       res.status(500).json({ message: "Failed to fetch safe places" });
