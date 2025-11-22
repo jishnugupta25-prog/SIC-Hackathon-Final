@@ -618,14 +618,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Priority-ordered search types (POLICE FIRST, then HOSPITAL, then PHARMACY, then rest)
       const searchTypes = [
-        // Police stations - HIGHEST PRIORITY (fetched first)
-        { amenities: ["police", "fire_station", "ambulance_station"], type: "police", radius: 0.1, priority: 1 },
+        // Police stations - HIGHEST PRIORITY (fetched first) - MAXIMUM coverage
+        { amenities: ["police", "fire_station", "ambulance_station", "police_station"], type: "police", radius: 0.2, priority: 1 },
         // Hospitals - SECOND PRIORITY
-        { amenities: ["hospital", "clinic", "emergency_ward"], type: "hospital", radius: 0.1, priority: 2 },
+        { amenities: ["hospital", "clinic", "emergency_ward", "medical", "health"], type: "hospital", radius: 0.2, priority: 2 },
         // Pharmacies - THIRD PRIORITY
-        { amenities: ["pharmacy", "chemist"], type: "pharmacy", radius: 0.1, priority: 3 },
+        { amenities: ["pharmacy", "chemist", "medicine_shop", "drugstore"], type: "pharmacy", radius: 0.2, priority: 3 },
         // Safe zones - LOWEST PRIORITY
-        { amenities: ["community_centre", "community_center", "shelter"], type: "safe_zone", radius: 0.1, priority: 4 },
+        { amenities: ["community_centre", "community_center", "shelter", "public_building", "civic_center"], type: "safe_zone", radius: 0.2, priority: 4 },
       ];
 
       // Create all fetch promises in parallel (NO SEQUENTIAL DELAYS)
@@ -636,7 +636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const fetchPromise = (async () => {
             try {
               const bbox = `${userLon - searchType.radius},${userLat - searchType.radius},${userLon + searchType.radius},${userLat + searchType.radius}`;
-              const url = `https://nominatim.openstreetmap.org/search?q=[${amenity}]&viewbox=${bbox}&bounded=1&format=json&limit=50&addressdetails=1`;
+              const url = `https://nominatim.openstreetmap.org/search?q=[${amenity}]&viewbox=${bbox}&bounded=1&format=json&limit=150&addressdetails=1`;
               
               const response = await fetch(url, {
                 headers: { 'User-Agent': 'CrimeReportPortal/1.0' }
@@ -724,7 +724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Then sort by distance (closest first)
           return a.distance - b.distance;
         })
-        .slice(0, 50); // Limit to 50 results
+        .slice(0, 500); // Return all nearby places - comprehensive coverage
 
       const fetchTime = Date.now() - startTime;
       console.log(`[Safe Places] ⚡ Fetched ${safePlaces.length} places in ${fetchTime}ms. Police: ${safePlaces.filter(p => p.type === 'police').length}, Hospital: ${safePlaces.filter(p => p.type === 'hospital').length}, Pharmacy: ${safePlaces.filter(p => p.type === 'pharmacy').length}, With phones: ${safePlaces.filter(p => p.phone).length}`);
