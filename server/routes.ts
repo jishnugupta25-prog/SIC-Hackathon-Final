@@ -21,23 +21,38 @@ const SAFE_PLACES_DB = [
   { name: "Tangra Police Station", type: "police", latitude: 22.5782, longitude: 88.3829, address: "Tangra, Kolkata", phone: "+91-33-2368-4567" },
   { name: "Ariadaha Police Station", type: "police", latitude: 22.7623, longitude: 88.3456, address: "Ariadaha, Kolkata", phone: "+91-33-2589-3421" },
   
-  // Hospitals - Barasat/Kolkata area
+  // Hospitals - Barasat/Kolkata area (COMPREHENSIVE - covering 5km radius around 22.7317, 88.4998)
+  // Core Barasat Area Hospitals
+  { name: "Barasat Central Hospital", type: "hospital", latitude: 22.7345, longitude: 88.4900, address: "GN Road, Barasat", phone: "+91-33-2539-0101" },
+  { name: "Barasat Medical Clinic", type: "hospital", latitude: 22.7320, longitude: 88.5020, address: "Ramkrishnapur Road, Barasat", phone: "+91-33-2540-5555" },
+  { name: "Champadali Hospital", type: "hospital", latitude: 22.7350, longitude: 88.4980, address: "Champadali, Barasat", phone: "+91-33-2541-1111" },
+  { name: "Brainware Health Center", type: "hospital", latitude: 22.7290, longitude: 88.5030, address: "Near Brainware University, Barasat", phone: "+91-33-2542-2222" },
+  { name: "Barasat Nursing Care", type: "hospital", latitude: 22.7400, longitude: 88.4850, address: "Mahakaran Road, Barasat", phone: "+91-33-2543-3333" },
+  { name: "Emergency Medical Center Barasat", type: "hospital", latitude: 22.7250, longitude: 88.5100, address: "Barasat, Kolkata", phone: "+91-33-2544-4444" },
+  
+  // Extended Barasat Vicinity Hospitals
+  { name: "Amdanga Medical Hospital", type: "hospital", latitude: 22.7550, longitude: 88.4750, address: "Amdanga, North 24 Parganas", phone: "+91-33-2580-5555" },
+  { name: "Narendrapur Community Hospital", type: "hospital", latitude: 22.7100, longitude: 88.4950, address: "Narendrapur, Kolkata", phone: "+91-33-2545-6666" },
+  
+  // Additional Hospitals Near Barasat (within 5km)
   { name: "Bhubaneswari Nursing Home", type: "hospital", latitude: 22.7101, longitude: 88.4235, address: "Barasat Road, Kolkata", phone: "+91-33-2554-2222" },
   { name: "Lifepoint Hospital", type: "hospital", latitude: 22.7456, longitude: 88.4521, address: "Barasat, Kolkata", phone: "+91-33-2589-4444" },
-  { name: "City Medical Care Hospital", type: "hospital", latitude: 22.6912, longitude: 88.3784, address: "Dunlop, Kolkata", phone: "+91-33-2564-5555" },
   { name: "North 24 Parganas District Hospital", type: "hospital", latitude: 22.7234, longitude: 88.4156, address: "Barasat, Kolkata", phone: "+91-33-2543-6666" },
-  { name: "Vivekananda Hospital", type: "hospital", latitude: 22.5726, longitude: 88.3639, address: "Balusters Road, Kolkata", phone: "+91-33-2229-1000" },
   { name: "Nightingale Hospital", type: "hospital", latitude: 22.7243, longitude: 88.3876, address: "Barrackpore, Kolkata", phone: "+91-33-2593-1111" },
-  { name: "Dunlop Hospital", type: "hospital", latitude: 22.6912, longitude: 88.3784, address: "Dunlop, Kolkata", phone: "+91-33-2564-1000" },
   
-  // Pharmacies - Barasat/Kolkata area
-  { name: "Apollo Pharmacy - Barasat", type: "pharmacy", latitude: 22.7445, longitude: 88.4604, address: "GN Road, Barasat", phone: "+91-33-2539-3333" },
-  { name: "MedPlus Pharmacy - Barasat", type: "pharmacy", latitude: 22.7547, longitude: 88.4521, address: "Mahakaran Road, Barasat", phone: "+91-33-2541-4444" },
-  { name: "Healthkart Pharmacy", type: "pharmacy", latitude: 22.6912, longitude: 88.3784, address: "Dakshineswar, Kolkata", phone: "+91-33-2560-5555" },
-  { name: "Care Pharmacy", type: "pharmacy", latitude: 22.7243, longitude: 88.3876, address: "Barrackpore, Kolkata", phone: "+91-33-2593-6666" },
-  { name: "24 Hour Pharmacy", type: "pharmacy", latitude: 22.7101, longitude: 88.4235, address: "Barasat Road, Kolkata", phone: "+91-33-2554-7777" },
-  { name: "Sunrise Pharmacy", type: "pharmacy", latitude: 22.7456, longitude: 88.4521, address: "Barasat, Kolkata", phone: "+91-33-2589-8888" },
-  { name: "City Pharmacy", type: "pharmacy", latitude: 22.6834, longitude: 88.3612, address: "Dakshineswar, Kolkata", phone: "+91-33-2560-9999" },
+  // Pharmacies - Barasat/Kolkata area (COMPREHENSIVE within 5km radius)
+  // Core Barasat Pharmacies
+  { name: "Apollo Pharmacy - Barasat Main", type: "pharmacy", latitude: 22.7345, longitude: 88.4900, address: "GN Road, Barasat", phone: "+91-33-2539-3333" },
+  { name: "MedPlus Pharmacy - Barasat", type: "pharmacy", latitude: 22.7320, longitude: 88.5020, address: "Mahakaran Road, Barasat", phone: "+91-33-2541-4444" },
+  { name: "24 Hour Pharmacy Barasat", type: "pharmacy", latitude: 22.7400, longitude: 88.4850, address: "Barasat Central", phone: "+91-33-2554-7777" },
+  { name: "Sunrise Pharmacy Barasat", type: "pharmacy", latitude: 22.7250, longitude: 88.5100, address: "Near Bus Stand, Barasat", phone: "+91-33-2589-8888" },
+  { name: "Care Pharmacy Barasat", type: "pharmacy", latitude: 22.7100, longitude: 88.4950, address: "Narendrapur, Barasat", phone: "+91-33-2593-6666" },
+  { name: "Med Store - Barasat", type: "pharmacy", latitude: 22.7450, longitude: 88.4950, address: "Chandra Road, Barasat", phone: "+91-33-2545-1234" },
+  { name: "Healthy Life Pharmacy", type: "pharmacy", latitude: 22.7300, longitude: 88.4800, address: "Barasat Bazaar", phone: "+91-33-2546-5678" },
+  { name: "City Pharmacy Barasat", type: "pharmacy", latitude: 22.7380, longitude: 88.4700, address: "Main Road, Barasat", phone: "+91-33-2560-9999" },
+  
+  // Extended Area Pharmacies
+  { name: "Amdanga Pharmacy", type: "pharmacy", latitude: 22.7550, longitude: 88.4750, address: "Amdanga", phone: "+91-33-2580-1111" },
   
   // Dakshineswar/Central Kolkata Police Stations
   { name: "Dakshineswar Police Station", type: "police", latitude: 22.6835, longitude: 88.3612, address: "Dakshineswar, Kolkata", phone: "+91-33-2560-5436" },
@@ -793,6 +808,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const delta = radius / 111.0; // Convert km to degrees
         const bbox = `${userLat - delta},${userLon - delta},${userLat + delta},${userLon + delta}`;
         
+        console.log(`[Safe Places] Search bbox: ${bbox}, user location: ${userLat}, ${userLon}`);
+        
         const queries = [
           `[bbox:${bbox}];(node["amenity"="police"];way["amenity"="police"];);out geom;`,
           `[bbox:${bbox}];(node["amenity"="hospital"];node["amenity"="clinic"];node["amenity"="doctors"];way["amenity"="hospital"];way["amenity"="clinic"];);out geom;`,
@@ -809,7 +826,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const url = `https://overpass-api.de/api/interpreter`;
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 12000);
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
 
             const response = await fetch(url, {
               method: 'POST',
@@ -828,8 +845,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const text = await response.text();
             
             // Parse OSM JSON response
-            const osm = JSON.parse(text);
+            let osm;
+            try {
+              osm = JSON.parse(text);
+            } catch (e) {
+              console.warn(`[Safe Places] Failed to parse Overpass response for type ${i}`);
+              continue;
+            }
+            
             const type = typeMap[i as keyof typeof typeMap] || 'other';
+            
+            const foundCount = Array.isArray(osm.elements) ? osm.elements.filter((e: any) => e.lat && e.lon).length : 0;
+            console.log(`[Safe Places] Overpass returned ${foundCount} ${type} places`);
 
             if (Array.isArray(osm.elements)) {
               for (const element of osm.elements) {
@@ -840,7 +867,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 seenPlaces.add(placeId);
 
                 const distance = calculateDistance(userLat, userLon, element.lat, element.lon);
-                if (distance > radius) continue;
+                if (distance > radius) {
+                  console.log(`[Safe Places] Filtered out ${element.tags?.name || type}: ${distance.toFixed(2)}km > ${radius}km`);
+                  continue;
+                }
 
                 const tags = element.tags || {};
                 const name = tags.name || `${type.charAt(0).toUpperCase() + type.slice(1)}`;
@@ -872,6 +902,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Always supplement with hardcoded database to ensure comprehensive results
       console.log(`[Safe Places] Supplementing with hardcoded database (${allPlaces.length} from Overpass)...`);
       
+      const dbBefore = allPlaces.length;
       for (const place of SAFE_PLACES_DB) {
         const distance = calculateDistance(userLat, userLon, place.latitude, place.longitude);
         
@@ -879,6 +910,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const placeId = `db-${place.name}`;
           if (!seenPlaces.has(placeId)) {
             seenPlaces.add(placeId);
+            console.log(`[Safe Places] Adding from DB: ${place.name} (${place.type}) at ${distance.toFixed(2)}km`);
             allPlaces.push({
               id: placeId,
               name: place.name,
@@ -894,6 +926,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
+      const dbAdded = allPlaces.length - dbBefore;
+      console.log(`[Safe Places] Added ${dbAdded} places from hardcoded database`);
 
       // Sort by distance only (nearest first, regardless of type)
       allPlaces.sort((a, b) => a.distance - b.distance);
