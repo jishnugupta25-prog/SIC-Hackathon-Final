@@ -176,22 +176,22 @@ export default function CrimeMap() {
         </div>
         <div style="position: absolute; bottom: 8px; right: 8px; background: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; color: #666; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">© OpenStreetMap</div>
       </div>
-      <script>
-        setTimeout(function() {
-          const toggleBtn = document.getElementById('legend-toggle');
-          const legendContent = document.getElementById('legend-content');
-          if (toggleBtn && legendContent) {
-            toggleBtn.addEventListener('click', function() {
-              const isHidden = legendContent.style.display === 'none';
-              legendContent.style.display = isHidden ? 'block' : 'none';
-              toggleBtn.textContent = isHidden ? '▲' : '▼';
-            });
-          }
-        }, 0);
-      </script>
     `;
     
     container.innerHTML = html;
+    
+    // Attach legend toggle functionality after DOM is rendered
+    setTimeout(() => {
+      const toggleBtn = document.getElementById("legend-toggle");
+      const legendContent = document.getElementById("legend-content");
+      if (toggleBtn && legendContent) {
+        toggleBtn.addEventListener("click", function () {
+          const isHidden = legendContent.style.display === "none";
+          legendContent.style.display = isHidden ? "block" : "none";
+          toggleBtn.textContent = isHidden ? "▲" : "▼";
+        });
+      }
+    }, 0);
   }, [location, crimes]);
 
   const getCrimeTypeColor = (type: string) => {
