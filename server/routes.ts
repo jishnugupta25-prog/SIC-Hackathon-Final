@@ -397,73 +397,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Latitude and longitude required" });
       }
 
+      const numLat = parseFloat(lat);
+      const numLon = parseFloat(lon);
+      
+      if (isNaN(numLat) || isNaN(numLon)) {
+        return res.status(400).json({ message: "Invalid coordinates" });
+      }
+
       const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
       
       // Add timeout with AbortController
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
       
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'CrimeReportPortal/1.0'
-        },
-        signal: controller.signal
-      });
+      let data;
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'CrimeReportPortal/1.0'
+          },
+          signal: controller.signal
+        });
 
-      clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
 
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.warn("[Reverse Geocode] Invalid content type:", contentType);
-        return res.json({ placeName: "Unknown Location" });
-      }
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          console.warn("[Reverse Geocode] Invalid content type:", contentType);
+          throw new Error("Invalid content type");
+        }
 
-      const data = await response.json();
-      
-      if (!data) {
-        return res.json({ placeName: "Unknown Location" });
+        data = await response.json();
+        
+        if (!data) {
+          throw new Error("Empty response");
+        }
+      } catch (fetchError: any) {
+        console.warn("[Reverse Geocode] Fetch failed, using fallback:", fetchError.message);
+        clearTimeout(timeoutId);
+        // Return fallback location name
+        return res.json({ 
+          placeName: "Current Location", 
+          hierarchy: [],
+          isFallback: true 
+        });
       }
 
       const address = data.address || {};
       const displayName = data.display_name || "";
       
-      // Strategy: Prefer address components over display_name for accuracy
-      // Address components are more structured and reliable
+      // Strategy: Extract most relevant location name
       let placeName = "";
       
-      // Get candidate from address components - prioritize small/specific areas
+      // Step 1: Try address components in priority order
       const addressCandidate = 
         address.suburb ||           // Most specific: suburb/locality
+        address.neighbourhood ||    // Neighborhood
         address.town ||             // Town level
         address.hamlet ||           // Hamlet/small area
         address.village ||          // Village
         address.district ||         // District level
-        address.city ||             // City (fallback)
-        address.county ||           // County
-        address.state;              // State
+        address.city;               // City (fallback from address components)
       
-      // If we have a good address component, use it
-      if (addressCandidate && 
-          addressCandidate !== address.city && 
-          addressCandidate !== address.state &&
-          addressCandidate.length > 2) {
+      // Step 2: If we have a good address component, use it
+      if (addressCandidate && addressCandidate.length > 1) {
         placeName = addressCandidate;
         console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (from address components)`);
-      } else if (address.city && address.city !== address.state) {
-        // Use city as secondary option
-        placeName = address.city;
-        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (from city)`);
-      } else {
-        // Last resort: parse display_name carefully
-        const displayParts = displayName.split(",").map((p: string) => p.trim());
-        // Look for meaningful parts in display_name (not too short, not generic)
-        const meaningfulPart = displayParts.find((part: string) => 
-          part.length > 3 && 
-          !["India", "Country", address.state, address.city].includes(part)
-        ) || displayParts[0];
+      } else if (displayName && displayName.length > 0) {
+        // Step 3: Parse display_name carefully if address components aren't good
+        const displayParts = displayName.split(",").map((p: string) => p.trim()).filter(Boolean);
         
-        placeName = meaningfulPart || address.country || "Unknown Location";
-        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (fallback from display_name)`);
+        if (displayParts.length > 0) {
+          // Try to find first non-generic part
+          const genericTerms = ["India", "Country", address.state, address.country];
+          let bestPart = displayParts[0]; // Default to first part
+          
+          // Find first meaningful (non-generic) part
+          for (const part of displayParts) {
+            if (part && part.length > 2 && !genericTerms.includes(part)) {
+              bestPart = part;
+              break;
+            }
+          }
+          
+          placeName = bestPart;
+          console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (from display_name: ${displayName})`);
+        }
+      }
+      
+      // Step 4: Final fallback - use city or state
+      if (!placeName || placeName.length < 1) {
+        placeName = address.city || address.state || address.country || "Unknown Location";
+        console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName} (fallback)`);
       }
       
       // Build complete address hierarchy for display
