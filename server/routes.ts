@@ -394,7 +394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Reverse geocode - get place name from coordinates using Google Maps
+  // Reverse geocode - get place name from coordinates using Photon (free OSM service)
   app.get('/api/reverse-geocode', isAuthenticated, async (req: any, res) => {
     try {
       const lat = req.query.lat as string;
@@ -411,74 +411,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid coordinates" });
       }
 
-      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-      if (!apiKey) {
-        console.warn("[Reverse Geocode] Google Maps API key not configured");
-        return res.json({ placeName: "My Location", hierarchy: [] });
-      }
+      console.log(`[Reverse Geocode] Reverse geocoding: ${numLat},${numLon}`);
 
-      console.log(`[Reverse Geocode] Calling Google Maps for: ${numLat},${numLon}`);
-
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${numLat},${numLon}&key=${apiKey}`;
+      // Use Photon (OSM) - free reverse geocoding
+      const photonUrl = `https://photon.komoot.io/reverse?lon=${numLon}&lat=${numLat}&limit=1`;
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       
       let response, data;
       try {
-        response = await fetch(url, {
-          signal: controller.signal
+        response = await fetch(photonUrl, {
+          signal: controller.signal,
+          headers: { 'User-Agent': 'Crime-Report-Portal/1.0' }
         });
 
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          console.warn(`[Reverse Geocode] HTTP ${response.status}`);
+          console.warn(`[Reverse Geocode] Photon HTTP ${response.status}`);
           return res.json({ placeName: "My Location", hierarchy: [] });
         }
 
         data = await response.json();
-        console.log(`[Reverse Geocode] Google Maps response status: ${data.status}`);
       } catch (fetchError: any) {
-        console.error(`[Reverse Geocode] Fetch error: ${fetchError.message}`);
+        console.error(`[Reverse Geocode] Photon error: ${fetchError.message}`);
         clearTimeout(timeoutId);
         return res.json({ placeName: "My Location", hierarchy: [] });
       }
       
-      if (data.status !== 'OK' || !data.results || data.results.length === 0) {
-        console.warn(`[Reverse Geocode] API error: ${data.status}. Results: ${data.results?.length || 0}`);
+      if (!data.features || data.features.length === 0) {
+        console.warn(`[Reverse Geocode] No results from Photon for ${numLat},${numLon}`);
         return res.json({ placeName: "My Location", hierarchy: [] });
       }
 
-      const result = data.results[0];
-      const placeName = result.formatted_address || result.address_components?.[0]?.long_name || "My Location";
+      const result = data.features[0];
+      const properties = result.properties || {};
+      
+      // Build place name from properties
+      const parts = [];
+      if (properties.name) parts.push(properties.name);
+      if (properties.city) parts.push(properties.city);
+      if (properties.state) parts.push(properties.state);
+      if (properties.country) parts.push(properties.country);
+      
+      const placeName = parts.length > 0 ? parts.join(', ') : 'My Location';
+      
+      // Build hierarchy
+      const hierarchy: string[] = [];
+      if (properties.name) hierarchy.push(properties.name);
+      if (properties.city && properties.city !== properties.name) hierarchy.push(properties.city);
+      if (properties.state) hierarchy.push(properties.state);
+      if (properties.country) hierarchy.push(properties.country);
+
       console.log(`[Reverse Geocode] ✓ Success: ${numLat},${numLon} -> ${placeName}`);
       
-      // Extract address components
-      const addressComponents = result.address_components || [];
-      const hierarchy: string[] = [];
-      
-      // Build hierarchy: village/city -> district -> state -> country
-      const componentMap: Record<string, string> = {};
-      for (const component of addressComponents) {
-        const types = component.types || [];
-        if (types.includes('locality') || types.includes('administrative_area_level_3')) {
-          componentMap.locality = component.long_name;
-        } else if (types.includes('administrative_area_level_2')) {
-          componentMap.district = component.long_name;
-        } else if (types.includes('administrative_area_level_1')) {
-          componentMap.state = component.long_name;
-        } else if (types.includes('country')) {
-          componentMap.country = component.long_name;
-        }
-      }
-
-      if (componentMap.locality) hierarchy.push(componentMap.locality);
-      if (componentMap.district) hierarchy.push(componentMap.district);
-      if (componentMap.state) hierarchy.push(componentMap.state);
-      if (componentMap.country) hierarchy.push(componentMap.country);
-
-      console.log(`[Reverse Geocode] ${lat}, ${lon} -> ${placeName}`);
       res.json({
         placeName: placeName,
         hierarchy: hierarchy,
@@ -635,7 +622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Safe Places route using Google Places Nearby Search
+  // Safe Places route using Overpass API (OpenStreetMap)
   app.get('/api/safe-places', isAuthenticated, async (req: any, res) => {
     try {
       const startTime = Date.now();
@@ -648,75 +635,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log(`[Safe Places] Fetching locations for: ${userLat}, ${userLon}`);
-      
-      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-      if (!apiKey) {
-        console.warn("[Safe Places] Google Maps API key not configured");
-        return res.json([]);
-      }
 
-      // Priority-ordered search types
+      // Priority-ordered search types with Overpass query tags
       const searchTypes = [
-        { keyword: "police station", type: "police", priority: 1 },
-        { keyword: "hospital", type: "hospital", priority: 2 },
-        { keyword: "pharmacy", type: "pharmacy", priority: 3 },
+        { tags: 'amenity=police', type: 'police', priority: 1 },
+        { tags: 'amenity=hospital OR amenity=doctors OR healthcare=hospital', type: 'hospital', priority: 2 },
+        { tags: 'amenity=pharmacy', type: 'pharmacy', priority: 3 },
       ];
 
-      const radius = 5000; // 5km search radius
+      const radius = 5000; // 5km in meters
       const safePlaces: any[] = [];
       const seenPlaces = new Set<string>();
 
-      // Fetch nearby places for each type
+      // Helper to convert bbox radius
+      const delta = (radius / 111000); // rough conversion: 111km per degree
+      const bbox = `${userLat - delta},${userLon - delta},${userLat + delta},${userLon + delta}`;
+
+      // Fetch nearby places for each type using Overpass API
       const fetchPromises = searchTypes.map(async (searchType) => {
         try {
-          const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${userLat},${userLon}&radius=${radius}&keyword=${encodeURIComponent(searchType.keyword)}&key=${apiKey}`;
+          // Overpass API query
+          const overpassQuery = `[bbox:${bbox}];(node[${searchType.tags}];way[${searchType.tags}];);out center;`;
+          const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
           
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000);
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
           
           const response = await fetch(url, {
-            signal: controller.signal
+            signal: controller.signal,
+            headers: { 'User-Agent': 'Crime-Report-Portal/1.0' }
           });
 
           clearTimeout(timeoutId);
 
           if (!response.ok) {
-            console.warn(`[Safe Places] HTTP ${response.status} for ${searchType.keyword}`);
+            console.warn(`[Safe Places] HTTP ${response.status} for ${searchType.type}`);
             return [];
           }
 
           const data = await response.json();
           
-          if (data.status !== 'OK' || !Array.isArray(data.results)) {
-            console.warn(`[Safe Places] API error for ${searchType.keyword}: ${data.status}`);
+          if (!Array.isArray(data.elements)) {
+            console.warn(`[Safe Places] Invalid response for ${searchType.type}`);
             return [];
           }
 
-          return data.results.map((place: any) => {
-            const placeId = place.place_id;
-            
-            // Skip duplicates
-            if (seenPlaces.has(placeId)) return null;
-            seenPlaces.add(placeId);
+          return data.elements
+            .filter((place: any) => place.lat && place.lon)
+            .map((place: any) => {
+              const placeId = `${place.type}-${place.id}`;
+              
+              // Skip duplicates
+              if (seenPlaces.has(placeId)) return null;
+              seenPlaces.add(placeId);
 
-            const distance = calculateDistance(userLat, userLon, place.geometry.location.lat, place.geometry.location.lng);
+              // Get center point for ways
+              const lat = place.center?.lat || place.lat;
+              const lon = place.center?.lon || place.lon;
+              
+              const distance = calculateDistance(userLat, userLon, lat, lon);
+              
+              // Extract name and phone from tags
+              const tags = place.tags || {};
+              const name = tags.name || `${searchType.type.charAt(0).toUpperCase() + searchType.type.slice(1)}`;
+              const phone = tags.phone || tags['contact:phone'] || "";
+              const address = tags['addr:full'] || `${tags['addr:street'] || ''} ${tags['addr:housenumber'] || ''}`.trim() || 'No address available';
 
-            return {
-              id: placeId,
-              name: place.name,
-              type: searchType.type,
-              latitude: place.geometry.location.lat,
-              longitude: place.geometry.location.lng,
-              address: place.vicinity || place.formatted_address || "No address available",
-              phone: place.formatted_phone_number || place.international_phone_number || "",
-              distance: Math.round(distance * 1000) / 1000,
-              priority: searchType.priority,
-              rating: place.rating || 0,
-              isOpen: place.opening_hours?.open_now
-            };
-          }).filter(Boolean);
+              return {
+                id: placeId,
+                name: name,
+                type: searchType.type,
+                latitude: lat,
+                longitude: lon,
+                address: address,
+                phone: phone,
+                distance: Math.round(distance * 1000) / 1000,
+                priority: searchType.priority,
+                rating: 0,
+                isOpen: undefined
+              };
+            })
+            .filter(Boolean)
+            .slice(0, 10); // Limit to 10 results per type
         } catch (error: any) {
-          console.warn(`[Safe Places] Error fetching ${searchType.keyword}:`, error.message);
+          console.warn(`[Safe Places] Error fetching ${searchType.type}:`, error.message);
           return [];
         }
       });
@@ -739,12 +741,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const fetchTime = Date.now() - startTime;
-      console.log(`[Safe Places] ⚡ Fetched ${allPlaces.length} places in ${fetchTime}ms. Police: ${allPlaces.filter(p => p.type === 'police').length}, Hospital: ${allPlaces.filter(p => p.type === 'hospital').length}, Pharmacy: ${allPlaces.filter(p => p.type === 'pharmacy').length}, With phones: ${allPlaces.filter(p => p.phone).length}`);
+      console.log(`[Safe Places] ✓ Fetched ${allPlaces.length} places in ${fetchTime}ms. Police: ${allPlaces.filter(p => p.type === 'police').length}, Hospital: ${allPlaces.filter(p => p.type === 'hospital').length}, Pharmacy: ${allPlaces.filter(p => p.type === 'pharmacy').length}, With phones: ${allPlaces.filter(p => p.phone).length}`);
 
       res.json(allPlaces);
     } catch (error) {
-      console.error("Error fetching safe places:", error);
-      res.status(500).json({ message: "Failed to fetch safe places" });
+      console.error("[Safe Places] Error:", error);
+      res.json([]);
     }
   });
 
