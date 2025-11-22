@@ -92,20 +92,66 @@ export default function CrimeMap() {
     const container = document.getElementById("crime-map-container");
     if (!container || !location) return;
 
-    // Create a simple map background with Google Maps Static API as fallback
-    const mapImage = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${location.longitude},${location.latitude},12,0/600x400@2x?access_token=pk.eyJ1IjoiZXhhbXBsZSIsImEiOiJjbHZ6In0.example`;
-    
-    // Create simple HTML-based map display
+    // Calculate positions with collision avoidance
+    const crimeColors: Record<string, string> = {
+      Theft: "#f97316",
+      Burglary: "#d946ef",
+      Assault: "#ef4444",
+      Robbery: "#0ea5e9",
+      Vandalism: "#eab308",
+      "Vehicle Theft": "#10b981",
+      Fraud: "#f97316",
+      Harassment: "#ef4444",
+      Other: "#6b7280",
+    };
+
+    const positions = crimes.map((crime, idx) => {
+      const offsetLat = (crime.latitude - location.latitude) * 1000;
+      const offsetLon = (crime.longitude - location.longitude) * 1000;
+      let x = 50 + (offsetLon / 1000) * 25;
+      let y = 50 - (offsetLat / 1000) * 25;
+
+      // Collision avoidance: spread out nearby crimes
+      let collisionFound = true;
+      let attempt = 0;
+      while (collisionFound && attempt < 8) {
+        collisionFound = false;
+        for (let j = 0; j < idx; j++) {
+          const otherPos = positions[j];
+          const dist = Math.sqrt(
+            Math.pow(x - otherPos.x, 2) + Math.pow(y - otherPos.y, 2),
+          );
+          if (dist < 8) {
+            collisionFound = true;
+            const angle = Math.atan2(y - otherPos.y, x - otherPos.x);
+            x += Math.cos(angle) * 3;
+            y += Math.sin(angle) * 3;
+            break;
+          }
+        }
+        attempt++;
+      }
+
+      return { x: Math.max(8, Math.min(92, x)), y: Math.max(8, Math.min(92, y)), crime, idx };
+    });
+
+    const color = (type: string) => crimeColors[type] || "#6b7280";
+
     const html = `
       <div style="position: relative; width: 100%; height: 100%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
         <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #e8f4f8 0%, #d4e6eb 100%);"></div>
-        <div style="position: absolute; width: 20px; height: 20px; background: #3b82f6; border: 3px solid #1e40af; border-radius: 50%; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 10; box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.2);"></div>
-        ${crimes.map((crime, idx) => {
-          const offsetLat = (crime.latitude - location.latitude) * 1000;
-          const offsetLon = (crime.longitude - location.longitude) * 1000;
-          const x = 50 + (offsetLon / 1000) * 30;
-          const y = 50 - (offsetLat / 1000) * 30;
-          return `<div style="position: absolute; width: 12px; height: 12px; background: #ef4444; border: 2px solid #dc2626; border-radius: 50%; left: ${Math.max(5, Math.min(95, x))}%; top: ${Math.max(5, Math.min(95, y))}%; transform: translate(-50%, -50%); cursor: pointer; z-index: 5; transition: all 0.2s;" onmouseover="this.style.transform='translate(-50%, -50%) scale(1.3)'; this.style.zIndex='20';" onmouseout="this.style.transform='translate(-50%, -50%) scale(1)'; this.style.zIndex='5';" title="${crime.crimeType} - ${formatDate(crime.reportedAt)}"></div>`;
+        <div style="position: absolute; width: 24px; height: 24px; background: #3b82f6; border: 4px solid #1e40af; border-radius: 50%; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 10; box-shadow: 0 0 0 10px rgba(59, 130, 246, 0.15);"></div>
+        ${positions.map((pos) => {
+          const bgColor = color(pos.crime.crimeType);
+          return `
+            <div style="position: absolute; left: ${pos.x}%; top: ${pos.y}%; z-index: 5; transform: translate(-50%, -50%);">
+              <div style="position: relative; width: 28px; height: 28px; cursor: pointer; transition: all 0.3s ease;">
+                <div style="position: absolute; width: 28px; height: 28px; background: ${bgColor}; border: 3px solid ${bgColor}; border-radius: 50%; box-shadow: 0 0 0 3px white, 0 2px 8px rgba(0,0,0,0.2); transition: all 0.3s;" onmouseover="this.style.transform='scale(1.4)'; this.style.zIndex='20'; this.style.boxShadow='0 0 0 3px white, 0 4px 12px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 0 0 3px white, 0 2px 8px rgba(0,0,0,0.2)';"></div>
+                <div style="position: absolute; width: 24px; height: 24px; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: white; z-index: 6; pointer-events: none;">${pos.idx + 1}</div>
+                <div style="position: absolute; top: -30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: white; padding: 4px 8px; border-radius: 4px; white-space: nowrap; font-size: 11px; font-weight: 500; pointer-events: none; opacity: 0; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0'">${pos.crime.crimeType}</div>
+              </div>
+            </div>
+          `;
         }).join('')}
         <div style="position: absolute; bottom: 8px; right: 8px; background: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; color: #666; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">© OpenStreetMap</div>
       </div>
