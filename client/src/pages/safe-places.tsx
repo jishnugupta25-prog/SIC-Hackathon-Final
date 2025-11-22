@@ -128,29 +128,21 @@ export default function SafePlaces() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  // Get current location on mount and watch for updates
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setLocationStatus("disabled");
-      setLocationErrorMessage("Geolocation is not supported by your browser");
-      setShowLocationAlert(true);
-      return;
-    }
-
+  // Request location function (can be called from multiple places)
+  const requestLocationFn = () => {
     const options = {
       enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 30000, // Use cached position if available (30 seconds) to avoid poor accuracy readings
+      timeout: 5000, // Reduced to 5 seconds for faster initial location fetch
+      maximumAge: 5000, // Use cached position only if less than 5 seconds old for fresher data
     };
 
-    // Request permission and get initial position
-    const requestLocation = () => {
+    const startLocationRequest = () => {
       setLocationStatus("loading");
       const timeout = setTimeout(() => {
         setLocationStatus("disabled");
         setLocationErrorMessage("Location request timed out. Please try again.");
         setShowLocationAlert(true);
-      }, 12000);
+      }, 7000); // Timeout fallback after 7 seconds
       
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -212,7 +204,19 @@ export default function SafePlaces() {
       );
     };
 
-    requestLocation();
+    startLocationRequest();
+  };
+
+  // Get current location on mount and watch for updates
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationStatus("disabled");
+      setLocationErrorMessage("Geolocation is not supported by your browser");
+      setShowLocationAlert(true);
+      return;
+    }
+
+    requestLocationFn();
 
     // Watch for continuous location updates with 100m distance threshold
     const watchId = navigator.geolocation.watchPosition(
@@ -490,27 +494,6 @@ export default function SafePlaces() {
                   <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
                   Accuracy: ±{displayLocation.accuracy}m
                 </div>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={async () => {
-                    setLocationStatus("loading");
-                    try {
-                      const { name: placeName, hierarchy } = await fetchPlaceName(currentLocation.latitude, currentLocation.longitude, true);
-                      const updatedLoc = { ...currentLocation, placeName, hierarchy };
-                      setCurrentLocation(updatedLoc);
-                      setLocationStatus("active");
-                      toast({ title: "Refreshed", description: "Location updated successfully!" });
-                    } catch (error) {
-                      setLocationStatus("active");
-                      toast({ title: "Error", description: "Failed to refresh location", variant: "destructive" });
-                    }
-                  }}
-                  data-testid="button-refresh-location"
-                >
-                  <Navigation className="h-3 w-3 mr-1" />
-                  Refresh
-                </Button>
               </div>
             </div>
           )}
@@ -526,56 +509,26 @@ export default function SafePlaces() {
                   </div>
                 </div>
               </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => {
-                  const options = {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0,
-                  };
-                  setLocationStatus("loading");
-                  navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                      const currentLoc = {
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                        accuracy: Math.round(position.coords.accuracy),
-                      };
-                      
-                      lastLocationRef.current = { latitude: currentLoc.latitude, longitude: currentLoc.longitude };
-                      const { name: placeName, hierarchy } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
-                      currentLoc.placeName = placeName;
-                      currentLoc.hierarchy = hierarchy;
-                      
-                      setCurrentLocation(currentLoc);
-                      setLocation({
-                        latitude: currentLoc.latitude,
-                        longitude: currentLoc.longitude,
-                        name: placeName,
-                      });
-                      setLocationStatus("active");
-                      toast({ title: "Success", description: "Location enabled and detected!" });
-                    },
-                    (error) => {
-                      setLocationStatus("disabled");
-                      toast({ title: "Error", description: "Still unable to access location. Please enable it in your device settings.", variant: "destructive" });
-                    },
-                    options
-                  );
-                }}
-                className="w-full"
-                data-testid="button-enable-location"
-              >
-                <Navigation className="h-3 w-3 mr-2" />
-                Enable Location Services
-              </Button>
               <p className="text-xs text-muted-foreground">
                 💡 <strong>Tip:</strong> Go to your browser/device settings and enable location access for this app
               </p>
             </div>
           )}
+
+          {/* Refresh Button - Always Visible */}
+          <div className="flex gap-2 pt-2">
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => requestLocationFn()}
+              disabled={locationStatus === "loading"}
+              className="flex-1"
+              data-testid="button-refresh-location"
+            >
+              <Navigation className="h-3 w-3 mr-1" />
+              {locationStatus === "loading" ? "Fetching..." : "Refresh Location"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -595,42 +548,11 @@ export default function SafePlaces() {
             <AlertDialogCancel>Dismiss</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                const options = {
-                  enableHighAccuracy: true,
-                  timeout: 10000,
-                  maximumAge: 0,
-                };
-                setLocationStatus("loading");
-                navigator.geolocation.getCurrentPosition(
-                  async (position) => {
-                    const currentLoc = {
-                      latitude: position.coords.latitude,
-                      longitude: position.coords.longitude,
-                      accuracy: Math.round(position.coords.accuracy),
-                    };
-                    
-                    lastLocationRef.current = { latitude: currentLoc.latitude, longitude: currentLoc.longitude };
-                    const { name: placeName, hierarchy } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
-                    currentLoc.placeName = placeName;
-                    currentLoc.hierarchy = hierarchy;
-                    
-                    setCurrentLocation(currentLoc);
-                    setLocation({
-                      latitude: currentLoc.latitude,
-                      longitude: currentLoc.longitude,
-                      name: placeName,
-                    });
-                    setLocationStatus("active");
-                    setShowLocationAlert(false);
-                  },
-                  () => {
-                    setLocationStatus("disabled");
-                  },
-                  options
-                );
+                setShowLocationAlert(false);
+                requestLocationFn();
               }}
             >
-              Retry
+              Try Again
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
