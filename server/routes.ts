@@ -102,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/auth/logout', (req: any, res) => {
     req.logout((err: any) => {
       if (err) return res.status(500).json({ message: 'Logout failed' });
-      res.json({ success: true });
+      res.redirect('/login');
     });
   });
 

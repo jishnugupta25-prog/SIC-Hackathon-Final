@@ -98,7 +98,7 @@ export function AppSidebar() {
           </div>
         </div>
         <Button variant="outline" className="w-full" asChild data-testid="button-logout">
-          <a href="/api/logout">
+          <a href="/api/auth/logout">
             <LogOut className="h-4 w-4 mr-2" />
             Sign Out
           </a>
