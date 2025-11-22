@@ -12,7 +12,6 @@ import {
   text,
   real,
   integer,
-  boolean,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -77,7 +76,7 @@ export const crimeReports = pgTable("crime_reports", {
   latitude: real("latitude").notNull(),
   longitude: real("longitude").notNull(),
   address: text("address"),
-  isAnonymous: boolean("is_anonymous").default(false),
+  isAnonymous: integer("is_anonymous").default(0), // 0=false, 1=true for SQLite compatibility
   reportedAt: timestamp("reported_at"),
   createdAt: timestamp("created_at"),
 });

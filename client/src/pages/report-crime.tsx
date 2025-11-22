@@ -105,7 +105,7 @@ export default function ReportCrime() {
       latitude: 0,
       longitude: 0,
       address: "",
-      isAnonymous: false,
+      isAnonymous: 0,
     },
   });
 
@@ -316,8 +316,8 @@ export default function ReportCrime() {
                       <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                         <FormControl>
                           <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
+                            checked={field.value === 1}
+                            onCheckedChange={(checked) => field.onChange(checked ? 1 : 0)}
                             data-testid="checkbox-anonymous"
                           />
                         </FormControl>
