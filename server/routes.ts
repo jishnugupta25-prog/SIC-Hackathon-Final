@@ -602,7 +602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Safe Places route - fetches real locations with phone numbers from OpenStreetMap
+  // Safe Places route - fetches comprehensive real locations with phone numbers from OpenStreetMap
   app.get('/api/safe-places', isAuthenticated, async (req: any, res) => {
     try {
       const userLat = parseFloat(req.query.latitude as string);
@@ -613,72 +613,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid coordinates" });
       }
       
-      console.log(`[Safe Places] Fetching real locations for: ${userLat}, ${userLon}`);
+      console.log(`[Safe Places] Fetching comprehensive locations for: ${userLat}, ${userLon}`);
       
-      // Search for real locations using Nominatim API
+      // Comprehensive search types with multiple amenity variations
       const searchTypes = [
-        { amenity: "hospital", type: "hospital", radius: 0.05 },
-        { amenity: "police", type: "police", radius: 0.05 },
-        { amenity: "pharmacy", type: "pharmacy", radius: 0.05 },
-        { amenity: "community_center", type: "safe_zone", radius: 0.05 },
+        // Hospitals and medical facilities
+        { amenities: ["hospital", "clinic", "emergency_ward"], type: "hospital", radius: 0.1 },
+        // Police stations and law enforcement
+        { amenities: ["police", "fire_station", "ambulance_station"], type: "police", radius: 0.1 },
+        // Pharmacies and medicine shops
+        { amenities: ["pharmacy", "chemist"], type: "pharmacy", radius: 0.1 },
+        // Safe zones and community centers
+        { amenities: ["community_centre", "community_center", "shelter"], type: "safe_zone", radius: 0.1 },
       ];
 
       let allPlaces: any[] = [];
 
       for (const searchType of searchTypes) {
-        try {
-          // Search for this type of location near user
-          const bbox = `${userLon - searchType.radius},${userLat - searchType.radius},${userLon + searchType.radius},${userLat + searchType.radius}`;
-          const url = `https://nominatim.openstreetmap.org/search?amenity=${searchType.amenity}&viewbox=${bbox}&bounded=1&format=json&limit=10`;
-          
-          const response = await fetch(url, {
-            headers: { 'User-Agent': 'CrimeReportPortal/1.0' }
-          });
-
-          if (response.ok) {
-            const data = await response.json();
+        for (const amenity of searchType.amenities) {
+          try {
+            // Larger search radius to capture more results
+            const bbox = `${userLon - searchType.radius},${userLat - searchType.radius},${userLon + searchType.radius},${userLat + searchType.radius}`;
             
-            if (Array.isArray(data)) {
-              data.forEach((location: any, idx: number) => {
-                const distance = calculateDistance(userLat, userLon, parseFloat(location.lat), parseFloat(location.lon));
-                
-                allPlaces.push({
-                  id: `${searchType.type}-${idx}`,
-                  name: location.display_name?.split(',')[0] || location.name || 'Unknown Location',
-                  type: searchType.type,
-                  latitude: parseFloat(location.lat),
-                  longitude: parseFloat(location.lon),
-                  address: location.display_name || 'No address available',
-                  phone: location.address?.phone || location.phone || '',
-                  distance: Math.round(distance * 100) / 100,
+            // Primary search using Nominatim with better parameters
+            const url = `https://nominatim.openstreetmap.org/search?q=[${amenity}]&viewbox=${bbox}&bounded=1&format=json&limit=50&addressdetails=1`;
+            
+            const response = await fetch(url, {
+              headers: { 'User-Agent': 'CrimeReportPortal/1.0' }
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              
+              if (Array.isArray(data) && data.length > 0) {
+                data.forEach((location: any, idx: number) => {
+                  try {
+                    const lat = parseFloat(location.lat);
+                    const lon = parseFloat(location.lon);
+                    
+                    if (isNaN(lat) || isNaN(lon)) return;
+                    
+                    const distance = calculateDistance(userLat, userLon, lat, lon);
+                    
+                    // Extract phone number from multiple possible locations
+                    let phone = '';
+                    if (location.address?.phone) {
+                      phone = location.address.phone;
+                    } else if (location.phone) {
+                      phone = location.phone;
+                    } else if (location.extratags?.phone) {
+                      phone = location.extratags.phone;
+                    } else if (location.display_name?.includes('phone')) {
+                      // Try to extract from display name if available
+                      const phoneMatch = location.display_name.match(/\d{3,}[-.\d]/);
+                      phone = phoneMatch ? phoneMatch[0] : '';
+                    }
+                    
+                    // Determine name from various sources
+                    let name = location.name || 
+                      location.display_name?.split(',')[0] || 
+                      location.address?.name ||
+                      'Unknown Location';
+                    
+                    // Filter out generic results that are likely not actual places
+                    if (name.length < 2 || name === 'Unknown Location') {
+                      return;
+                    }
+                    
+                    const placeId = `${searchType.type}-${Math.round(lat * 10000)}-${Math.round(lon * 10000)}`;
+                    
+                    allPlaces.push({
+                      id: placeId,
+                      name: name.trim(),
+                      type: searchType.type,
+                      latitude: lat,
+                      longitude: lon,
+                      address: location.display_name || 'No address available',
+                      phone: phone.trim(),
+                      distance: Math.round(distance * 1000) / 1000, // Round to 3 decimals (more precise)
+                    });
+                  } catch (itemError) {
+                    console.warn(`[Safe Places] Error processing location item:`, itemError);
+                  }
                 });
-              });
+              }
             }
+          } catch (error) {
+            console.warn(`[Safe Places] Error searching for ${amenity}:`, error);
           }
-        } catch (error) {
-          console.warn(`[Safe Places] Error searching for ${searchType.amenity}:`, error);
+          
+          // Add small delay between requests to respect API rate limits
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
 
       // Remove duplicates (same location, different search results)
       const uniquePlaces: any[] = [];
-      const seenLocations = new Set<string>();
+      const seenLocations = new Map<string, any>();
 
       for (const place of allPlaces) {
-        const locKey = `${Math.round(place.latitude * 1000)},${Math.round(place.longitude * 1000)}`;
+        // Use rounded coordinates as key to detect duplicates
+        const locKey = `${Math.round(place.latitude * 100)},${Math.round(place.longitude * 100)}`;
+        
         if (!seenLocations.has(locKey)) {
-          seenLocations.add(locKey);
-          uniquePlaces.push(place);
+          seenLocations.set(locKey, place);
+        } else {
+          // If duplicate found, keep the one with phone number
+          const existing = seenLocations.get(locKey);
+          if (place.phone && !existing.phone) {
+            seenLocations.set(locKey, place);
+          }
         }
       }
 
-      // Sort by distance (closest first)
-      uniquePlaces.sort((a, b) => a.distance - b.distance);
+      // Convert map to array and sort by distance
+      const sortedPlaces = Array.from(seenLocations.values())
+        .sort((a, b) => a.distance - b.distance);
       
-      // Limit to top 15 closest places
-      const safePlaces = uniquePlaces.slice(0, 15);
+      // Return all places (or limit if too many)
+      const safePlaces = sortedPlaces.slice(0, 50); // Return up to 50 places
       
-      console.log(`[Safe Places] Found ${safePlaces.length} unique places. Closest: ${safePlaces[0]?.name} (${safePlaces[0]?.distance}km)`);
+      console.log(`[Safe Places] Found ${safePlaces.length} unique places. ${safePlaces.filter(p => p.phone).length} have phone numbers.`);
+      if (safePlaces[0]) {
+        console.log(`[Safe Places] Closest: ${safePlaces[0].name} (${safePlaces[0].distance}km, Phone: ${safePlaces[0].phone || 'N/A'})`);
+      }
 
       res.json(safePlaces);
     } catch (error) {
