@@ -780,7 +780,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Safe Places] Fetching locations for: ${userLat}, ${userLon}`);
 
-      const radius = 20; // 20km search radius
+      const radius = 5; // 5km search radius
       const radiusMeters = radius * 1000;
       const allPlaces: any[] = [];
       const seenPlaces = new Set<string>();
