@@ -333,32 +333,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Search worldwide - no viewbox restriction
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8`;
+      
+      // Add timeout with AbortController
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout for suggestions
+      
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'CrimeReportPortal/1.0'
-        }
+        },
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
+        console.warn("[Suggestions] Invalid content type:", contentType);
         return res.json([]);
       }
 
       const data = await response.json();
       if (!data || !Array.isArray(data)) {
+        console.warn("[Suggestions] Response not an array");
         return res.json([]);
       }
 
-      const suggestions = data.map((item: any) => ({
-        displayName: item.display_name,
-        latitude: parseFloat(item.lat),
-        longitude: parseFloat(item.lon)
-      }));
+      const suggestions = data.map((item: any) => {
+        try {
+          const lat = parseFloat(item.lat);
+          const lon = parseFloat(item.lon);
+          if (isNaN(lat) || isNaN(lon)) return null;
+          
+          return {
+            displayName: item.display_name || 'Unknown',
+            latitude: lat,
+            longitude: lon
+          };
+        } catch {
+          return null;
+        }
+      }).filter(Boolean);
 
       console.log(`[Suggestions] Found ${suggestions.length} results for "${query}"`);
       res.json(suggestions);
     } catch (error: any) {
-      console.error("[Suggestions] Error:", error.message);
+      if (error.name === 'AbortError') {
+        console.warn("[Suggestions] Request timeout for:", error.message);
+      } else {
+        console.error("[Suggestions] Error:", error.message);
+      }
       res.json([]);
     }
   });
@@ -374,14 +398,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+      
+      // Add timeout with AbortController
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'CrimeReportPortal/1.0'
-        }
+        },
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
+        console.warn("[Reverse Geocode] Invalid content type:", contentType);
         return res.json({ placeName: "Unknown Location" });
       }
 
@@ -476,11 +509,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Use OpenStreetMap Nominatim API with proper headers
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(placeName)}&format=json&limit=1`;
+      
+      // Add timeout with AbortController
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'CrimeReportPortal/1.0'
-        }
+        },
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       const contentType = response.headers.get('content-type');
       let data;
@@ -628,6 +669,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { amenities: ["community_centre", "community_center", "shelter", "public_building", "civic_center"], type: "safe_zone", radius: 0.2, priority: 4 },
       ];
 
+      // Helper function to fetch with timeout and retry
+      const fetchWithRetry = async (url: string, amenity: string, maxRetries: number = 2): Promise<any[]> => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+            
+            const response = await fetch(url, {
+              headers: { 'User-Agent': 'CrimeReportPortal/1.0' },
+              signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+              console.warn(`[Safe Places] API returned status ${response.status} for ${amenity}`);
+              return [];
+            }
+            
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+              console.warn(`[Safe Places] Invalid content type for ${amenity}`);
+              return [];
+            }
+
+            const data = await response.json();
+            if (!Array.isArray(data)) {
+              console.warn(`[Safe Places] Response not an array for ${amenity}`);
+              return [];
+            }
+
+            return data;
+          } catch (error: any) {
+            if (attempt < maxRetries && error.name !== 'AbortError') {
+              console.warn(`[Safe Places] Attempt ${attempt} failed for ${amenity}, retrying...`);
+              await new Promise(r => setTimeout(r, 500)); // Wait before retry
+            } else {
+              console.warn(`[Safe Places] Failed to fetch ${amenity} after ${attempt} attempts:`, error.message);
+              return [];
+            }
+          }
+        }
+        return [];
+      };
+
       // Create all fetch promises in parallel (NO SEQUENTIAL DELAYS)
       const allFetchPromises: Promise<any[]>[] = [];
 
@@ -638,16 +724,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const bbox = `${userLon - searchType.radius},${userLat - searchType.radius},${userLon + searchType.radius},${userLat + searchType.radius}`;
               const url = `https://nominatim.openstreetmap.org/search?q=[${amenity}]&viewbox=${bbox}&bounded=1&format=json&limit=150&addressdetails=1`;
               
-              const response = await fetch(url, {
-                headers: { 'User-Agent': 'CrimeReportPortal/1.0' }
-              });
+              const locations = await fetchWithRetry(url, amenity);
 
-              if (!response.ok) return [];
-              
-              const data = await response.json();
-              if (!Array.isArray(data)) return [];
-
-              return data.map((location: any) => {
+              return locations.map((location: any) => {
                 try {
                   const lat = parseFloat(location.lat);
                   const lon = parseFloat(location.lon);
@@ -665,7 +744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     location.address?.name ||
                     'Unknown Location';
                   
-                  if (name.length < 2 || name === 'Unknown Location') return null;
+                  if (!name || name.length < 2 || name === 'Unknown Location') return null;
                   
                   return {
                     id: `${searchType.type}-${Math.round(lat * 10000)}-${Math.round(lon * 10000)}`,
@@ -678,12 +757,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     distance: Math.round(distance * 1000) / 1000,
                     priority: searchType.priority,
                   };
-                } catch {
+                } catch (itemError) {
+                  console.warn(`[Safe Places] Error processing location:`, itemError);
                   return null;
                 }
               }).filter(Boolean);
             } catch (error) {
-              console.warn(`[Safe Places] Error searching for ${amenity}:`, error);
+              console.warn(`[Safe Places] Error in fetch promise for ${amenity}:`, error);
               return [];
             }
           })();
@@ -693,13 +773,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Execute ALL fetches in parallel (fast!)
-      const results = await Promise.all(allFetchPromises);
-      const allPlaces = results.flat();
+      const results = await Promise.all(allFetchPromises.map(p => p.catch(e => {
+        console.warn(`[Safe Places] Promise rejection:`, e);
+        return [];
+      })));
+      const allPlaces = results.flat().filter(Boolean);
+
+      if (!allPlaces || allPlaces.length === 0) {
+        console.warn(`[Safe Places] No locations found for ${userLat}, ${userLon}`);
+        return res.json([]);
+      }
 
       // Remove duplicates using coordinate-based deduplication
       const seenLocations = new Map<string, any>();
 
       for (const place of allPlaces) {
+        if (!place || typeof place !== 'object') continue;
+        
         const locKey = `${Math.round(place.latitude * 100)},${Math.round(place.longitude * 100)}`;
         
         if (!seenLocations.has(locKey)) {
