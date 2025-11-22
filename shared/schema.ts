@@ -30,7 +30,7 @@ export const sessions = pgTable(
 
 // User storage table - Required for Replit Auth
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id").primaryKey(),
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
@@ -45,7 +45,7 @@ export type User = typeof users.$inferSelect;
 
 // Emergency Contacts table
 export const emergencyContacts = pgTable("emergency_contacts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
@@ -70,7 +70,7 @@ export type EmergencyContact = typeof emergencyContacts.$inferSelect;
 
 // Crime Reports table
 export const crimeReports = pgTable("crime_reports", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   crimeType: varchar("crime_type", { length: 100 }).notNull(),
   description: text("description"),
@@ -100,7 +100,7 @@ export type CrimeReport = typeof crimeReports.$inferSelect;
 
 // SOS Alerts table - Track SOS button activations
 export const sosAlerts = pgTable("sos_alerts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   latitude: real("latitude").notNull(),
   longitude: real("longitude").notNull(),

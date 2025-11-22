@@ -1,6 +1,7 @@
 // Crime Report Portal - Database Storage Implementation
 // From javascript_database and javascript_log_in_with_replit blueprints
 
+import { randomUUID } from "node:crypto";
 import {
   users,
   emergencyContacts,
@@ -60,7 +61,7 @@ export class DatabaseStorage implements IStorage {
     if (!userData.id) {
       const [user] = await db
         .insert(users)
-        .values(userData)
+        .values({ ...userData, id: randomUUID() })
         .returning();
       return user;
     }
@@ -92,7 +93,7 @@ export class DatabaseStorage implements IStorage {
     const db = await getDb();
     const [newContact] = await db
       .insert(emergencyContacts)
-      .values(contact)
+      .values({ ...contact, id: randomUUID() })
       .returning();
     return newContact;
   }
@@ -140,7 +141,7 @@ export class DatabaseStorage implements IStorage {
     const db = await getDb();
     const [newReport] = await db
       .insert(crimeReports)
-      .values(report)
+      .values({ ...report, id: randomUUID() })
       .returning();
     return newReport;
   }
@@ -150,7 +151,7 @@ export class DatabaseStorage implements IStorage {
     const db = await getDb();
     const [newAlert] = await db
       .insert(sosAlerts)
-      .values(alert)
+      .values({ ...alert, id: randomUUID() })
       .returning();
     return newAlert;
   }
