@@ -211,15 +211,20 @@ export default function ReportCrime() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
+    <div className="space-y-6 max-w-4xl relative">
+      {/* Decorative background image */}
+      <div className="fixed bottom-0 left-0 opacity-5 pointer-events-none z-0 max-w-md">
+        <img src={crimeMapImg} alt="" className="w-full h-auto" />
+      </div>
+
+      <div className="relative z-10">
         <h1 className="text-3xl font-heading font-bold tracking-tight">Report a Crime</h1>
         <p className="text-muted-foreground mt-1">
           Help keep the community safe by reporting criminal activity
         </p>
       </div>
 
-      <div className="grid md:grid-cols-5 gap-6">
+      <div className="grid md:grid-cols-5 gap-6 relative z-10">
         <div className="md:col-span-3">
           <Card>
             <CardHeader>

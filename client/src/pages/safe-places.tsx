@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import safetyBadgeImg from "@assets/generated_images/safety_verification_badge.png";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -427,8 +428,13 @@ export default function SafePlaces() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="space-y-6 relative">
+      {/* Decorative background image */}
+      <div className="fixed top-20 right-4 opacity-8 pointer-events-none z-0 max-w-xs">
+        <img src={safetyBadgeImg} alt="" className="w-28 h-28" />
+      </div>
+
+      <div className="relative z-10">
         <h1 className="text-3xl font-heading font-bold tracking-tight">Safe Places</h1>
         <p className="text-muted-foreground mt-1">
           Find nearby hospitals, police stations, and safe zones
@@ -436,7 +442,7 @@ export default function SafePlaces() {
       </div>
 
       {/* Location Status Card */}
-      <Card className={`border-2 ${locationStatus === "active" ? "border-green-500/50 bg-green-50 dark:bg-green-950/20" : "border-red-500/50 bg-red-50 dark:bg-red-950/20"}`}>
+      <Card className={`border-2 relative z-10 ${locationStatus === "active" ? "border-green-500/50 bg-green-50 dark:bg-green-950/20" : "border-red-500/50 bg-red-50 dark:bg-red-950/20"}`}>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             {locationStatus === "active" ? (
