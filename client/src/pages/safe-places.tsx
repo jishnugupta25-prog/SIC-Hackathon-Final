@@ -133,8 +133,8 @@ export default function SafePlaces() {
   const requestLocationFn = () => {
     const options = {
       enableHighAccuracy: true,
-      timeout: 5000,
-      maximumAge: 5000,
+      timeout: 60000, // 60 seconds for satellite lock and accuracy
+      maximumAge: 0, // Always get fresh readings for max accuracy
     };
 
     setLocationStatus("loading");
@@ -142,7 +142,7 @@ export default function SafePlaces() {
       setLocationStatus("disabled");
       setLocationErrorMessage("Location request timed out. Please try again.");
       setShowLocationAlert(true);
-    }, 7000);
+    }, 65000); // 65 seconds (timeout + buffer)
     
     navigator.geolocation.getCurrentPosition(
       async (position) => {
@@ -216,8 +216,8 @@ export default function SafePlaces() {
     // Watch for continuous location updates with 100m distance threshold
     const watchOptions = {
       enableHighAccuracy: true,
-      timeout: 5000,
-      maximumAge: 0,
+      timeout: 60000, // 60 seconds for best accuracy
+      maximumAge: 0, // Always get fresh readings
     };
 
     const watchId = navigator.geolocation.watchPosition(

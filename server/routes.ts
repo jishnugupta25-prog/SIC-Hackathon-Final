@@ -498,11 +498,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[Reverse Geocode] Reverse geocoding: ${numLat},${numLon}`);
 
-      // Use Photon (OSM) - free reverse geocoding
-      const photonUrl = `https://photon.komoot.io/reverse?lon=${numLon}&lat=${numLat}&limit=1`;
+      // Use Photon (OSM) - free reverse geocoding with multiple results for best match
+      const photonUrl = `https://photon.komoot.io/reverse?lon=${numLon}&lat=${numLat}&limit=5`;
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       
       let response, data;
       try {
@@ -530,30 +530,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ placeName: "My Location", hierarchy: [] });
       }
 
-      const result = data.features[0];
+      // Find the best result - prefer building/amenity names over generic locations
+      let result = data.features[0];
+      for (const feature of data.features) {
+        const props = feature.properties || {};
+        // Prefer buildings, amenities, and specific places over administrative boundaries
+        const type = props.osm_type || '';
+        if ((type === 'building' || props.amenity || props.shop || props.office) && props.name) {
+          result = feature;
+          break;
+        }
+      }
+      
       const properties = result.properties || {};
       
       // Build place name with proper priority for exact location
-      // Priority: name (exact place like hospital) > locality/district > city > state > country
+      // Priority: building/amenity name > street > locality/district > city > state > country
       const parts = [];
       
-      // Prefer specific location names (buildings, localities)
+      // Highest priority: building, amenity, shop, or office names (specific place)
       if (properties.name && properties.name.length > 3) {
         parts.push(properties.name);
       }
       
-      // Add district/locality for geographic accuracy
-      if (properties.district) parts.push(properties.district);
-      else if (properties.locality && properties.locality !== properties.name) parts.push(properties.locality);
+      // Add street address if available and different from name
+      if (properties.street && properties.street !== properties.name && !parts.includes(properties.street)) {
+        parts.push(properties.street);
+      }
+      
+      // Add district/locality/village for geographic accuracy
+      if (properties.district && !parts.includes(properties.district)) {
+        parts.push(properties.district);
+      } else if (properties.locality && !parts.includes(properties.locality) && properties.locality !== properties.name) {
+        parts.push(properties.locality);
+      }
+      
+      // Add postal code if available
+      if (properties.postcode && !parts.includes(properties.postcode)) {
+        parts.push(properties.postcode);
+      }
       
       // Add city
-      if (properties.city && !parts.includes(properties.city)) parts.push(properties.city);
+      if (properties.city && !parts.includes(properties.city)) {
+        parts.push(properties.city);
+      }
       
       // Add state
-      if (properties.state && !parts.includes(properties.state)) parts.push(properties.state);
+      if (properties.state && !parts.includes(properties.state)) {
+        parts.push(properties.state);
+      }
       
       // Add country as fallback
-      if (properties.country && !parts.includes(properties.country)) parts.push(properties.country);
+      if (properties.country && !parts.includes(properties.country)) {
+        parts.push(properties.country);
+      }
       
       const placeName = parts.length > 0 ? parts.join(', ') : 'My Location';
       

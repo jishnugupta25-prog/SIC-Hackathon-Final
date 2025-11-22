@@ -121,8 +121,8 @@ export default function Home() {
 
     const options = {
       enableHighAccuracy: true, // Enable high accuracy for ±2-3 meters precision
-      timeout: 15000, // 15 seconds for high accuracy
-      maximumAge: 5000, // Use cached position if fresh
+      timeout: 60000, // 60 seconds for satellite lock and maximum accuracy
+      maximumAge: 0, // Always get fresh readings
     };
 
     console.log("Requesting SOS location...");

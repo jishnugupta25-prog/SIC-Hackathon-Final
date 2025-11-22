@@ -66,8 +66,8 @@ export default function CrimeMap() {
 
     const options = {
       enableHighAccuracy: true, // Enable high accuracy for ±2-3 meters precision
-      timeout: 15000, // 15 seconds for high accuracy
-      maximumAge: 5000, // Use cached position if fresh
+      timeout: 60000, // 60 seconds for satellite lock and maximum accuracy
+      maximumAge: 0, // Always get fresh readings
     };
 
     console.log("Requesting crime map location...");
@@ -202,10 +202,11 @@ export default function CrimeMap() {
       // Add click handlers to crime markers
       const markers = document.querySelectorAll(".crime-marker");
       markers.forEach((marker) => {
-        marker.addEventListener("click", function (e) {
+        marker.addEventListener("click", function (e: Event) {
           e.stopPropagation();
-          const googleMapsUrl = this.getAttribute("data-url");
-          if (confirm("Open Google Maps at this crime location?")) {
+          const target = e.currentTarget as HTMLElement;
+          const googleMapsUrl = target.getAttribute("data-url");
+          if (googleMapsUrl && confirm("Open Google Maps at this crime location?")) {
             window.open(googleMapsUrl, "_blank");
           }
         });
