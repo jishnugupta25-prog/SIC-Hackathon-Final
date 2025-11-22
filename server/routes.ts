@@ -512,6 +512,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin routes - real-time monitoring
+  app.get('/api/admin/sessions', isAuthenticated, async (req: any, res) => {
+    try {
+      const db = await (await import('./db')).getDb();
+      const { sessions: sessionsTable, users: usersTable } = await import('@shared/schema');
+      const { sql, eq } = await import('drizzle-orm');
+      
+      // Get all active sessions from the database
+      const sessionList = await db.select().from(sessionsTable);
+      
+      // Fetch user info for each session
+      const sessionsWithUsers = [];
+      for (const session of sessionList) {
+        try {
+          const sess = session.sess as any;
+          if (sess && sess.passport && sess.passport.user) {
+            const userId = sess.passport.user.claims?.sub || sess.passport.user.id;
+            if (userId) {
+              const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+              if (user) {
+                sessionsWithUsers.push({
+                  userId: user.id,
+                  email: user.email || '',
+                  firstName: user.firstName,
+                  lastName: user.lastName,
+                  sessionExpire: session.expire,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Error processing session:", e);
+        }
+      }
+      
+      res.json(sessionsWithUsers);
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+      res.status(500).json({ message: "Failed to fetch sessions" });
+    }
+  });
+
+  app.get('/api/admin/reports', isAuthenticated, async (req: any, res) => {
+    try {
+      const db = await (await import('./db')).getDb();
+      const { crimeReports: crimeReportsTable, users: usersTable } = await import('@shared/schema');
+      const { eq, desc } = await import('drizzle-orm');
+      
+      // Get all crime reports with user details
+      const reports = await db
+        .select({
+          id: crimeReportsTable.id,
+          userId: crimeReportsTable.userId,
+          crimeType: crimeReportsTable.crimeType,
+          description: crimeReportsTable.description,
+          latitude: crimeReportsTable.latitude,
+          longitude: crimeReportsTable.longitude,
+          address: crimeReportsTable.address,
+          isAnonymous: crimeReportsTable.isAnonymous,
+          createdAt: crimeReportsTable.createdAt,
+          userEmail: usersTable.email,
+          firstName: usersTable.firstName,
+          lastName: usersTable.lastName,
+        })
+        .from(crimeReportsTable)
+        .leftJoin(usersTable, eq(crimeReportsTable.userId, usersTable.id))
+        .orderBy(desc(crimeReportsTable.createdAt));
+      
+      // Transform the response
+      const formattedReports = reports.map((r: any) => ({
+        id: r.id,
+        userId: r.userId,
+        userEmail: r.userEmail,
+        userName: r.firstName && r.lastName ? `${r.firstName} ${r.lastName}` : undefined,
+        crimeType: r.crimeType,
+        description: r.description,
+        latitude: r.latitude,
+        longitude: r.longitude,
+        address: r.address,
+        isAnonymous: r.isAnonymous,
+        createdAt: r.createdAt,
+      }));
+      
+      res.json(formattedReports);
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      res.status(500).json({ message: "Failed to fetch reports" });
+    }
+  });
+
   // Safe Places route - calculates distances based on user location
   app.get('/api/safe-places', isAuthenticated, async (req: any, res) => {
     try {

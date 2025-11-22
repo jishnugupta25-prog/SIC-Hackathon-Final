@@ -16,6 +16,7 @@ import Contacts from "@/pages/contacts";
 import CrimeMap from "@/pages/crime-map";
 import ReportCrime from "@/pages/report-crime";
 import SafePlaces from "@/pages/safe-places";
+import AdminDashboard from "@/pages/admin-dashboard";
 import Signup from "@/pages/signup";
 import Login from "@/pages/login";
 
@@ -29,6 +30,7 @@ function Router() {
       <Route path="/crime-map" component={CrimeMap} />
       <Route path="/report-crime" component={ReportCrime} />
       <Route path="/safe-places" component={SafePlaces} />
+      <Route path="/admin" component={AdminDashboard} />
       <Route component={NotFound} />
     </Switch>
   );
