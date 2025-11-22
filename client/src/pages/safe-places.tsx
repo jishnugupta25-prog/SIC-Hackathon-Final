@@ -749,6 +749,17 @@ export default function SafePlaces() {
                             )}
                           </div>
                         </div>
+
+                        {/* Phone Number Display */}
+                        {place.phone && (
+                          <div className="bg-blue-50 dark:bg-blue-950/30 rounded-md p-2 border border-blue-200 dark:border-blue-800">
+                            <p className="text-xs text-muted-foreground mb-2">📞 Phone Number</p>
+                            <p className="font-mono text-sm font-semibold text-blue-600 dark:text-blue-400">
+                              {place.phone}
+                            </p>
+                          </div>
+                        )}
+
                         <div className="flex gap-2">
                           <Button
                             size="sm"
@@ -763,13 +774,14 @@ export default function SafePlaces() {
                           {place.phone && (
                             <Button
                               size="sm"
-                              variant="outline"
+                              variant="default"
                               asChild
+                              className="flex-1 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800"
                               data-testid={`button-call-${place.id}`}
                             >
                               <a href={`tel:${place.phone}`}>
                                 <Phone className="h-3 w-3 mr-2" />
-                                Call
+                                Call Now
                               </a>
                             </Button>
                           )}
