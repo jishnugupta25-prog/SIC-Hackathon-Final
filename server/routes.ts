@@ -334,6 +334,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Safety Scores API - Groups crimes by area and calculates real-time safety scores
+  app.get('/api/safety-scores', isAuthenticated, async (req: any, res) => {
+    try {
+      const crimes = await storage.getCrimeReports();
+      
+      // Group crimes by geographic area (1km radius clusters)
+      const areaMap = new Map<string, any[]>();
+      const AREA_RADIUS_KM = 1; // 1km radius for area clustering
+      
+      crimes.forEach(crime => {
+        let foundArea = false;
+        
+        // Check if crime falls within existing area cluster
+        for (const [areaKey, areaCrimes] of areaMap) {
+          if (areaCrimes.length > 0) {
+            const firstCrime = areaCrimes[0];
+            const distance = calculateDistance(
+              crime.latitude, crime.longitude,
+              firstCrime.latitude, firstCrime.longitude
+            );
+            
+            if (distance <= AREA_RADIUS_KM) {
+              areaCrimes.push(crime);
+              foundArea = true;
+              break;
+            }
+          }
+        }
+        
+        // If no cluster found, create new area
+        if (!foundArea) {
+          const areaKey = `${crime.latitude.toFixed(3)}_${crime.longitude.toFixed(3)}`;
+          areaMap.set(areaKey, [crime]);
+        }
+      });
+      
+      // Calculate safety tiers for each area
+      const safetyScores = Array.from(areaMap.entries()).map(([areaKey, areaCrimes]) => {
+        const crimeCount = areaCrimes.length;
+        let tier = "Excellent";
+        let score = 100;
+        
+        // Tier system: drops by 1 tier for every 5 crimes
+        if (crimeCount >= 15) {
+          tier = "Poor";
+          score = Math.max(0, 40 - (crimeCount - 15) * 2);
+        } else if (crimeCount >= 10) {
+          tier = "Fair";
+          score = Math.max(0, 60 - (crimeCount - 10) * 4);
+        } else if (crimeCount >= 5) {
+          tier = "Good";
+          score = Math.max(0, 80 - (crimeCount - 5) * 4);
+        } else {
+          tier = "Excellent";
+          score = 100 - crimeCount * 5;
+        }
+        
+        // Get average coordinates for area
+        const avgLat = areaCrimes.reduce((sum, c) => sum + c.latitude, 0) / areaCrimes.length;
+        const avgLon = areaCrimes.reduce((sum, c) => sum + c.longitude, 0) / areaCrimes.length;
+        
+        return {
+          areaId: areaKey,
+          latitude: avgLat,
+          longitude: avgLon,
+          crimeCount: crimeCount,
+          tier: tier,
+          score: Math.round(score),
+          recentCrimes: areaCrimes.slice(-3).map(c => ({
+            id: c.id,
+            crimeType: c.crimeType,
+            createdAt: c.createdAt,
+          })),
+        };
+      });
+      
+      // Sort by crime count (highest first)
+      safetyScores.sort((a, b) => b.crimeCount - a.crimeCount);
+      
+      console.log(`[Safety Scores] Calculated ${safetyScores.length} areas with ${crimes.length} total crimes`);
+      res.json(safetyScores);
+    } catch (error) {
+      console.error("Error calculating safety scores:", error);
+      res.status(500).json({ message: "Failed to calculate safety scores" });
+    }
+  });
+
   // SOS Alert routes
   app.post('/api/sos', isAuthenticated, async (req: any, res) => {
     try {

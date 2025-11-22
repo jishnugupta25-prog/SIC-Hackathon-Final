@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Users, FileText, Clock, MapPin, User } from "lucide-react";
+import { AlertTriangle, Users, FileText, Clock, MapPin, User, TrendingDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import {
   Table,
@@ -50,8 +50,15 @@ export default function AdminDashboard() {
     refetchInterval: autoRefresh ? 3000 : false, // Refresh every 3 seconds
   });
 
+  // Fetch real-time safety scores by area
+  const { data: safetyScoresData, isLoading: safetyScoresLoading } = useQuery({
+    queryKey: ["/api/safety-scores"],
+    refetchInterval: autoRefresh ? 3000 : false, // Refresh every 3 seconds
+  });
+
   const sessions: AdminSession[] = Array.isArray(sessionsData) ? sessionsData : [];
   const reports: AdminReport[] = Array.isArray(reportsData) ? reportsData : [];
+  const safetyScores: any[] = Array.isArray(safetyScoresData) ? safetyScoresData : [];
 
   const activeSessions = sessions.filter(
     (s) => new Date(s.sessionExpire) > new Date()
@@ -89,7 +96,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
@@ -127,6 +134,21 @@ export default function AdminDashboard() {
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Total active users
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">High-Risk Areas</CardTitle>
+            <TrendingDown className="h-4 w-4 text-chart-1" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {safetyScores.filter(s => s.tier === "Poor" || s.tier === "Fair").length}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Areas with low safety scores
             </p>
           </CardContent>
         </Card>
@@ -185,6 +207,71 @@ export default function AdminDashboard() {
                 ))}
               </TableBody>
             </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Safety Scores by Area */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Safety Scores by Area
+          </CardTitle>
+          <CardDescription>
+            Real-time safety tiers based on crime counts {autoRefresh && "(auto-updating)"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {safetyScoresLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-muted-foreground">Loading safety scores...</div>
+            </div>
+          ) : safetyScores.length === 0 ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-muted-foreground">No crime data available</div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {safetyScores.map((area, index) => {
+                const tierColor = {
+                  "Excellent": "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800",
+                  "Good": "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
+                  "Fair": "bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800",
+                  "Poor": "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                };
+                const tierTextColor = {
+                  "Excellent": "text-green-700 dark:text-green-400",
+                  "Good": "text-blue-700 dark:text-blue-400",
+                  "Fair": "text-yellow-700 dark:text-yellow-400",
+                  "Poor": "text-red-700 dark:text-red-400"
+                };
+                
+                return (
+                  <div key={area.areaId} className={`p-4 rounded-lg border-2 ${tierColor[area.tier as keyof typeof tierColor]}`}>
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold">
+                          Area {index + 1}: {area.latitude.toFixed(4)}°, {area.longitude.toFixed(4)}°
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge className={tierTextColor[area.tier as keyof typeof tierTextColor]}>
+                            {area.tier}
+                          </Badge>
+                          <span className="text-sm font-bold">{area.score}/100</span>
+                          <span className="text-xs text-muted-foreground">({area.crimeCount} crimes)</span>
+                        </div>
+                      </div>
+                    </div>
+                    {area.recentCrimes.length > 0 && (
+                      <div className="text-xs text-muted-foreground mt-2 pt-2 border-t">
+                        <p className="font-medium mb-1">Recent: {area.recentCrimes.map((c: any) => c.crimeType).join(", ")}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </CardContent>
       </Card>
