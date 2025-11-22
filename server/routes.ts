@@ -796,7 +796,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   address: address,
                   phone: phone,
                   distance: Math.round(distance * 100) / 100,
-                  priority: type === 'police' ? 1 : type === 'hospital' ? 2 : 3,
                   rating: 0,
                   isOpen: undefined
                 });
@@ -830,7 +829,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 address: place.address,
                 phone: place.phone,
                 distance: Math.round(distance * 100) / 100,
-                priority: place.type === 'police' ? 1 : place.type === 'hospital' ? 2 : 3,
                 rating: 0,
                 isOpen: undefined
               });
@@ -839,11 +837,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Sort by priority, then distance
-      allPlaces.sort((a, b) => {
-        if (a.priority !== b.priority) return a.priority - b.priority;
-        return a.distance - b.distance;
-      });
+      // Sort by distance only (nearest first, regardless of type)
+      allPlaces.sort((a, b) => a.distance - b.distance);
 
       const fetchTime = Date.now() - startTime;
       const police = allPlaces.filter(p => p.type === 'police').length;
