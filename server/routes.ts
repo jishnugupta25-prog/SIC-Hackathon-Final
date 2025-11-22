@@ -13,15 +13,28 @@ import { initializeDatabase } from "./initDb";
 
 // Safe places database for major Indian cities
 const SAFE_PLACES_DB = [
+  // Barasat/Kolkata area (around 22.725, 88.489)
+  { name: "Barasat Police Station", type: "police", latitude: 22.7445, longitude: 88.4604, address: "GN Road, Barasat, Kolkata", phone: "+91-33-2539-2019" },
+  { name: "Barasat North Police Station", type: "police", latitude: 22.7547, longitude: 88.4521, address: "Mahakaran Road, Barasat, Kolkata", phone: "+91-33-2541-8976" },
+  { name: "Dakshineswar Police Station", type: "police", latitude: 22.6835, longitude: 88.3612, address: "Dakshineswar, Kolkata", phone: "+91-33-2560-5436" },
+  { name: "Liluah Police Station", type: "police", latitude: 22.6128, longitude: 88.3945, address: "Liluah, Howrah", phone: "+91-33-2671-3784" },
+  { name: "Dunlop Hospital", type: "hospital", latitude: 22.6912, longitude: 88.3784, address: "Dunlop, Kolkata", phone: "+91-33-2564-1000" },
+  { name: "Calcutta Medical Research Institute", type: "hospital", latitude: 22.5482, longitude: 88.3589, address: "1 AJC Bose Road, Kolkata", phone: "+91-33-4007-7000" },
+  { name: "Vivekananda Hospital", type: "hospital", latitude: 22.5726, longitude: 88.3639, address: "Balusters Road, Kolkata", phone: "+91-33-2229-1000" },
+  { name: "Nightingale Hospital", type: "hospital", latitude: 22.7243, longitude: 88.3876, address: "Barrackpore, Kolkata", phone: "+91-33-2593-1111" },
+  { name: "Bhubaneswari Nursing Home", type: "hospital", latitude: 22.7101, longitude: 88.4235, address: "Barasat Road, Kolkata", phone: "+91-33-2554-2222" },
+  { name: "Apollo Pharmacy - Barasat", type: "pharmacy", latitude: 22.7445, longitude: 88.4604, address: "GN Road, Barasat", phone: "+91-33-2539-3333" },
+  { name: "MedPlus Pharmacy - Barasat", type: "pharmacy", latitude: 22.7547, longitude: 88.4521, address: "Mahakaran Road, Barasat", phone: "+91-33-2541-4444" },
+  { name: "Healthkart Pharmacy", type: "pharmacy", latitude: 22.6912, longitude: 88.3784, address: "Dakshineswar, Kolkata", phone: "+91-33-2560-5555" },
+  { name: "Care Pharmacy", type: "pharmacy", latitude: 22.7243, longitude: 88.3876, address: "Barrackpore, Kolkata", phone: "+91-33-2593-6666" },
+  { name: "24 Hour Pharmacy", type: "pharmacy", latitude: 22.7101, longitude: 88.4235, address: "Barasat Road, Kolkata", phone: "+91-33-2554-7777" },
+  
   // Kolkata region
   { name: "Kolkata Police HQ", type: "police", latitude: 22.5726, longitude: 88.3639, address: "AJC Bose Rd, Kolkata, West Bengal", phone: "+91-9833099930" },
-  { name: "Barasat Police Station", type: "police", latitude: 22.7445, longitude: 88.4604, address: "GN Road, Barasat, Kolkata", phone: "+91-33-2539-2019" },
   { name: "Hooghly Police Station", type: "police", latitude: 22.6457, longitude: 88.3944, address: "Park Circus, Kolkata", phone: "+91-33-2485-3141" },
   { name: "AIIMS Kolkata", type: "hospital", latitude: 22.5029, longitude: 88.3638, address: "Sector III, Salt Lake, Kolkata", phone: "+91-33-2334-5555" },
   { name: "Ruby General Hospital", type: "hospital", latitude: 22.5482, longitude: 88.3589, address: "1 AJC Bose Road, Kolkata", phone: "+91-33-4007-7000" },
   { name: "Medica Hospital", type: "hospital", latitude: 22.5238, longitude: 88.3805, address: "127, Mukundapur, Kolkata", phone: "+91-33-6652-0000" },
-  { name: "Apollo Pharmacy", type: "pharmacy", latitude: 22.5658, longitude: 88.3758, address: "Russell Street, Kolkata", phone: "+91-33-2229-2333" },
-  { name: "MedPlus Pharmacy", type: "pharmacy", latitude: 22.5726, longitude: 88.3639, address: "Park Circus, Kolkata", phone: "+91-9372-600-666" },
   
   // Delhi region
   { name: "Delhi Police HQ", type: "police", latitude: 28.6328, longitude: 77.2197, address: "Crime Branch, IP Estate, New Delhi", phone: "+91-11-2436-0346" },
