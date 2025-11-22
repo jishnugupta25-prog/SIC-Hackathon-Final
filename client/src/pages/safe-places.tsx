@@ -59,8 +59,34 @@ export default function SafePlaces() {
     accuracy: number; 
     placeName?: string;
     hierarchy?: string[];
+    locationDetails?: {
+      building: string;
+      street: string;
+      postalCode: string;
+      locality: string;
+      area: string;
+      city: string;
+      state: string;
+      country: string;
+    };
   } | null>(null);
-  const [displayLocation, setDisplayLocation] = useState<{ latitude: number; longitude: number; accuracy: number; placeName?: string; hierarchy?: string[] } | null>(null);
+  const [displayLocation, setDisplayLocation] = useState<{ 
+    latitude: number; 
+    longitude: number; 
+    accuracy: number; 
+    placeName?: string; 
+    hierarchy?: string[];
+    locationDetails?: {
+      building: string;
+      street: string;
+      postalCode: string;
+      locality: string;
+      area: string;
+      city: string;
+      state: string;
+      country: string;
+    };
+  } | null>(null);
   const [locationStatus, setLocationStatus] = useState<"loading" | "active" | "disabled" | "denied">("loading");
   const [selectedType, setSelectedType] = useState<"all" | "hospital" | "police" | "safe_zone" | "pharmacy">("all");
   const [searchPlace, setSearchPlace] = useState("");
@@ -76,7 +102,7 @@ export default function SafePlaces() {
   const placeNameCacheRef = useRef<Record<string, string>>({});
 
   // Helper to fetch and cache place name with complete hierarchy - defined outside useEffect so refresh button can use it
-  const fetchPlaceName = async (lat: number, lon: number, skipCache: boolean = false): Promise<{ name: string; hierarchy: string[] }> => {
+  const fetchPlaceName = async (lat: number, lon: number, skipCache: boolean = false): Promise<{ name: string; hierarchy: string[]; locationDetails: { building: string; street: string; postalCode: string; locality: string; area: string; city: string; state: string; country: string } }> => {
     try {
       // Create cache key from rounded coordinates
       const cacheKey = `${Math.round(lat * 10000)},${Math.round(lon * 10000)}`;
@@ -85,12 +111,12 @@ export default function SafePlaces() {
       if (!skipCache && cacheKey in placeNameCacheRef.current) {
         const cached = placeNameCacheRef.current[cacheKey];
         console.log(`[Cache] Found ${cacheKey} -> ${cached}`);
-        return { name: cached, hierarchy: [] };
+        return { name: cached, hierarchy: [], locationDetails: { building: '', street: '', postalCode: '', locality: '', area: '', city: '', state: '', country: '' } };
       }
       
       // Fetch from API
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
       
       const response = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`, {
         signal: controller.signal
@@ -99,19 +125,20 @@ export default function SafePlaces() {
       
       if (!response.ok) {
         console.warn(`[Reverse Geocode] API error: ${response.status}`);
-        return { name: "Unknown Location", hierarchy: [] };
+        return { name: "Unknown Location", hierarchy: [], locationDetails: { building: '', street: '', postalCode: '', locality: '', area: '', city: '', state: '', country: '' } };
       }
       
       const data = await response.json();
       const placeName = data.placeName || "Unknown Location";
       const hierarchy = data.hierarchy || [];
+      const locationDetails = data.locationDetails || {};
       
       placeNameCacheRef.current[cacheKey] = placeName;
       console.log(`[Reverse Geocode] ${lat.toFixed(4)}, ${lon.toFixed(4)} -> ${placeName}, Hierarchy: ${hierarchy.join(" → ")}`);
-      return { name: placeName, hierarchy };
+      return { name: placeName, hierarchy, locationDetails };
     } catch (error: any) {
       console.error("[Reverse Geocode] Error:", error.message || error);
-      return { name: "Unknown Location", hierarchy: [] };
+      return { name: "Unknown Location", hierarchy: [], locationDetails: { building: '', street: '', postalCode: '', locality: '', area: '', city: '', state: '', country: '' } };
     }
   };
 
@@ -168,10 +195,10 @@ export default function SafePlaces() {
         
         lastLocationRef.current = { latitude: currentLoc.latitude, longitude: currentLoc.longitude };
         
-        const { name: placeName, hierarchy } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
+        const { name: placeName, hierarchy, locationDetails } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
         
-        setCurrentLocation({ ...currentLoc, placeName, hierarchy });
-        setDisplayLocation({ ...currentLoc, placeName, hierarchy });
+        setCurrentLocation({ ...currentLoc, placeName, hierarchy, locationDetails });
+        setDisplayLocation({ ...currentLoc, placeName, hierarchy, locationDetails });
         setLocation({
           latitude: currentLoc.latitude,
           longitude: currentLoc.longitude,
@@ -257,10 +284,10 @@ export default function SafePlaces() {
             return;
           }
           
-          const { name: placeName, hierarchy } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
+          const { name: placeName, hierarchy, locationDetails } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
           
-          setCurrentLocation({ ...currentLoc, placeName, hierarchy });
-          setDisplayLocation({ ...currentLoc, placeName, hierarchy });
+          setCurrentLocation({ ...currentLoc, placeName, hierarchy, locationDetails });
+          setDisplayLocation({ ...currentLoc, placeName, hierarchy, locationDetails });
           if (!location) {
             setLocation({
               latitude: currentLoc.latitude,
@@ -473,33 +500,95 @@ export default function SafePlaces() {
           )}
 
           {locationStatus === "active" && displayLocation && (
-            <div className="space-y-3">
-              {displayLocation.placeName && (
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 p-3 rounded-md border border-green-200 dark:border-green-800">
-                  <p className="text-xs text-muted-foreground mb-1">📍 Current Location</p>
-                  <p className="text-sm font-semibold text-green-900 dark:text-green-100">{displayLocation.placeName}</p>
-                  {displayLocation.hierarchy && displayLocation.hierarchy.length > 0 && (
-                    <p className="text-xs text-green-700 dark:text-green-200 mt-1 truncate">
-                      {displayLocation.hierarchy.join(" → ")}
-                    </p>
-                  )}
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+              {/* Full Location Details Section */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 p-4 rounded-md border-2 border-green-200 dark:border-green-800 space-y-2">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-3">📍 COMPLETE LOCATION DETAILS</p>
+                
+                {/* Display all location components */}
+                {displayLocation.locationDetails && (
+                  <div className="space-y-1.5">
+                    {displayLocation.locationDetails.building && (
+                      <div className="text-sm">
+                        <span className="font-semibold text-green-900 dark:text-green-100">Building/Place:</span>
+                        <p className="text-green-800 dark:text-green-200 ml-0">{displayLocation.locationDetails.building}</p>
+                      </div>
+                    )}
+                    {displayLocation.locationDetails.street && (
+                      <div className="text-sm">
+                        <span className="font-semibold text-green-900 dark:text-green-100">Street:</span>
+                        <p className="text-green-800 dark:text-green-200 ml-0">{displayLocation.locationDetails.street}</p>
+                      </div>
+                    )}
+                    {displayLocation.locationDetails.postalCode && (
+                      <div className="text-sm">
+                        <span className="font-semibold text-green-900 dark:text-green-100">Postal Code:</span>
+                        <p className="text-green-800 dark:text-green-200 ml-0">{displayLocation.locationDetails.postalCode}</p>
+                      </div>
+                    )}
+                    {displayLocation.locationDetails.locality && (
+                      <div className="text-sm">
+                        <span className="font-semibold text-green-900 dark:text-green-100">Locality:</span>
+                        <p className="text-green-800 dark:text-green-200 ml-0">{displayLocation.locationDetails.locality}</p>
+                      </div>
+                    )}
+                    {displayLocation.locationDetails.area && (
+                      <div className="text-sm">
+                        <span className="font-semibold text-green-900 dark:text-green-100">Area/District:</span>
+                        <p className="text-green-800 dark:text-green-200 ml-0">{displayLocation.locationDetails.area}</p>
+                      </div>
+                    )}
+                    {displayLocation.locationDetails.city && (
+                      <div className="text-sm">
+                        <span className="font-semibold text-green-900 dark:text-green-100">City:</span>
+                        <p className="text-green-800 dark:text-green-200 ml-0">{displayLocation.locationDetails.city}</p>
+                      </div>
+                    )}
+                    {displayLocation.locationDetails.state && (
+                      <div className="text-sm">
+                        <span className="font-semibold text-green-900 dark:text-green-100">State/Province:</span>
+                        <p className="text-green-800 dark:text-green-200 ml-0">{displayLocation.locationDetails.state}</p>
+                      </div>
+                    )}
+                    {displayLocation.locationDetails.country && (
+                      <div className="text-sm">
+                        <span className="font-semibold text-green-900 dark:text-green-100">Country:</span>
+                        <p className="text-green-800 dark:text-green-200 ml-0">{displayLocation.locationDetails.country}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {displayLocation.placeName && (
+                  <div className="pt-2 border-t border-green-300 dark:border-green-700 mt-3">
+                    <p className="text-xs text-muted-foreground mb-1">Full Address</p>
+                    <p className="text-sm font-semibold text-green-900 dark:text-green-100 whitespace-normal">{displayLocation.placeName}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Coordinates Section */}
+              <div className="grid grid-cols-2 gap-3">
                 <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-green-200 dark:border-green-800">
-                  <p className="text-xs text-muted-foreground mb-1">Latitude</p>
-                  <p className="text-sm font-mono font-semibold">{displayLocation.latitude.toFixed(6)}</p>
+                  <p className="text-xs text-muted-foreground mb-1 font-semibold">Latitude</p>
+                  <p className="text-sm font-mono font-bold text-green-900 dark:text-green-100">{displayLocation.latitude.toFixed(6)}</p>
                 </div>
                 <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-green-200 dark:border-green-800">
-                  <p className="text-xs text-muted-foreground mb-1">Longitude</p>
-                  <p className="text-sm font-mono font-semibold">{displayLocation.longitude.toFixed(6)}</p>
+                  <p className="text-xs text-muted-foreground mb-1 font-semibold">Longitude</p>
+                  <p className="text-sm font-mono font-bold text-green-900 dark:text-green-100">{displayLocation.longitude.toFixed(6)}</p>
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-xs text-muted-foreground flex items-center gap-2">
-                  <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
-                  Accuracy: ±{displayLocation.accuracy}m
+
+              {/* GPS Accuracy */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-200 dark:border-blue-800">
+                <p className="text-xs font-semibold text-muted-foreground mb-1">GPS ACCURACY</p>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <p className="text-sm font-bold text-blue-900 dark:text-blue-100">Precision: ±{displayLocation.accuracy}m</p>
                 </div>
+                {displayLocation.accuracy > 100 && (
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">💡 Enable high-accuracy GPS on your device for better precision</p>
+                )}
               </div>
             </div>
           )}

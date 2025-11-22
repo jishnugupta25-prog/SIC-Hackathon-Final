@@ -587,6 +587,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const placeName = parts.length > 0 ? parts.join(', ') : 'My Location';
       
+      // Build detailed location components for comprehensive display
+      const locationDetails = {
+        building: properties.name || '',
+        street: properties.street || '',
+        postalCode: properties.postcode || '',
+        locality: properties.locality || '',
+        area: properties.district || '',
+        city: properties.city || '',
+        state: properties.state || '',
+        country: properties.country || ''
+      };
+      
       // Build hierarchy: locality/city -> district -> state -> country
       const hierarchy: string[] = [];
       if (properties.locality && !hierarchy.includes(properties.locality)) hierarchy.push(properties.locality);
@@ -600,6 +612,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         placeName: placeName,
         hierarchy: hierarchy,
+        locationDetails: locationDetails,
         latitude: numLat,
         longitude: numLon
       });
