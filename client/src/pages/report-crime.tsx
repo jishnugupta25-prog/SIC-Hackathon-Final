@@ -51,6 +51,7 @@ export default function ReportCrime() {
   const { toast } = useToast();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -174,9 +175,10 @@ export default function ReportCrime() {
     if (location) {
       form.setValue("latitude", location.latitude);
       form.setValue("longitude", location.longitude);
+      setSelectedLocation(location);
       toast({
         title: "Location Set",
-        description: "Using your current location",
+        description: `Using coordinates: ${location.latitude.toFixed(4)}°, ${location.longitude.toFixed(4)}°`,
       });
     }
   };
@@ -320,6 +322,23 @@ export default function ReportCrime() {
                       {location ? "Use Current Location" : "Location Unavailable"}
                     </Button>
                   </div>
+
+                  {selectedLocation && (
+                    <div className="border border-primary/20 bg-primary/5 rounded-lg p-4 space-y-2" data-testid="location-display">
+                      <p className="text-sm font-semibold text-foreground">Your Selected Location</p>
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-medium">Latitude:</span> {selectedLocation.latitude.toFixed(6)}°
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-medium">Longitude:</span> {selectedLocation.longitude.toFixed(6)}°
+                        </p>
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <Badge variant="default" className="text-xs">✓ Location Confirmed</Badge>
+                      </div>
+                    </div>
+                  )}
 
                   <FormField
                     control={form.control}
