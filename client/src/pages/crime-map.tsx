@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -11,8 +11,11 @@ import type { CrimeReport } from "@shared/schema";
 export default function CrimeMap() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.Marker[]>([]);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedCrime, setSelectedCrime] = useState<CrimeReport | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -58,6 +61,24 @@ export default function CrimeMap() {
       options
     );
   }, []);
+
+  // Load Google Maps script
+  useEffect(() => {
+    if (mapLoaded) return;
+    
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      console.warn("Google Maps API key not configured");
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setMapLoaded(true);
+    document.head.appendChild(script);
+  }, [mapLoaded]);
 
   const { data: crimes = [], isLoading, isError } = useQuery<CrimeReport[]>({
     queryKey: ["/api/crimes"],
@@ -113,6 +134,72 @@ export default function CrimeMap() {
     );
   }
 
+  // Initialize and update map with crime markers
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current || crimes.length === 0) return;
+
+    const mapElement = document.getElementById("crime-map-container");
+    if (!mapElement) return;
+
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current = [];
+
+    // Calculate bounds to fit all crimes
+    const bounds = new google.maps.LatLngBounds();
+    
+    crimes.forEach((crime) => {
+      const position = { lat: crime.latitude, lng: crime.longitude };
+      bounds.extend(position);
+
+      const marker = new google.maps.Marker({
+        position,
+        map: mapRef.current,
+        title: crime.crimeType,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: crime.crimeType === "Assault" || crime.crimeType === "Harassment" ? "#ef4444" : 
+                     crime.crimeType === "Robbery" ? "#f97316" :
+                     crime.crimeType === "Burglary" ? "#a855f7" :
+                     crime.crimeType === "Vehicle Theft" ? "#06b6d4" : "#eab308",
+          fillOpacity: 0.8,
+          strokeColor: "#ffffff",
+          strokeWeight: 2,
+        }
+      });
+
+      marker.addListener("click", () => setSelectedCrime(crime));
+      markersRef.current.push(marker);
+    });
+
+    // Fit map to bounds
+    if (markersRef.current.length > 0) {
+      mapRef.current.fitBounds(bounds);
+    } else if (location) {
+      mapRef.current.setCenter({ lat: location.latitude, lng: location.longitude });
+      mapRef.current.setZoom(12);
+    }
+  }, [mapLoaded, crimes, location]);
+
+  // Initialize map on first load
+  useEffect(() => {
+    if (!mapLoaded) return;
+
+    const mapElement = document.getElementById("crime-map-container");
+    if (!mapElement || mapRef.current) return;
+
+    const defaultLocation = location || { latitude: 20.5937, longitude: 78.9629 };
+    
+    mapRef.current = new google.maps.Map(mapElement, {
+      zoom: 12,
+      center: { lat: defaultLocation.latitude, lng: defaultLocation.longitude },
+      mapTypeControl: true,
+      fullscreenControl: true,
+      zoomControl: true,
+    });
+  }, [mapLoaded, location]);
+
   if (isError) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -139,21 +226,20 @@ export default function CrimeMap() {
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        {/* Map Placeholder & Crime List */}
+        {/* Map & Crime List */}
         <div className="md:col-span-2 space-y-4">
           <Card>
             <CardContent className="p-6">
-              <div className="aspect-video bg-muted rounded-md flex items-center justify-center mb-4">
-                <div className="text-center space-y-2">
-                  <Map className="h-12 w-12 text-muted-foreground mx-auto" />
-                  <p className="text-sm text-muted-foreground">
-                    Interactive crime map will be displayed here
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Google Maps integration with crime markers
-                  </p>
+              {!mapLoaded ? (
+                <div className="aspect-video bg-muted rounded-md flex items-center justify-center mb-4">
+                  <div className="text-center space-y-2">
+                    <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                    <p className="text-sm text-muted-foreground">Loading map...</p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div id="crime-map-container" className="aspect-video bg-muted rounded-md mb-4" style={{ height: "400px" }} />
+              )}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-primary" />
