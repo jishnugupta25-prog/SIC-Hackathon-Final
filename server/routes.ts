@@ -9,8 +9,12 @@ import { sendSosMessage } from "./twilio";
 import { analyzeCrimePatterns } from "./gemini";
 import { insertEmergencyContactSchema, insertCrimeReportSchema, insertSosAlertSchema } from "@shared/schema";
 import * as bcrypt from "bcryptjs";
+import { initializeDatabase } from "./initDb";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize database schema on startup (auto-creates tables if needed)
+  await initializeDatabase();
+  
   // Auth middleware
   await setupAuth(app);
 
