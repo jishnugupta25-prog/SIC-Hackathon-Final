@@ -53,6 +53,8 @@ export default function ReportCrime() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [selectedAddress, setSelectedAddress] = useState<string>("");
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -172,11 +174,31 @@ export default function ReportCrime() {
     });
   };
 
+  // Reverse geocode coordinates to get address
+  const fetchAddress = async (lat: number, lon: number) => {
+    setIsLoadingAddress(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+      );
+      const data = await response.json();
+      const address = data.address?.address || data.display_name || "Address not found";
+      setSelectedAddress(address);
+      form.setValue("address", address);
+    } catch (error) {
+      console.error("Failed to fetch address:", error);
+      setSelectedAddress("Unable to fetch address");
+    } finally {
+      setIsLoadingAddress(false);
+    }
+  };
+
   const useCurrentLocation = () => {
     if (location) {
       form.setValue("latitude", location.latitude);
       form.setValue("longitude", location.longitude);
       setSelectedLocation(location);
+      fetchAddress(location.latitude, location.longitude);
       toast({
         title: "Location Set",
         description: `Using coordinates: ${location.latitude.toFixed(4)}°, ${location.longitude.toFixed(4)}°`,
@@ -328,12 +350,23 @@ export default function ReportCrime() {
                     <div className="border border-primary/20 bg-primary/5 rounded-lg p-4 space-y-2" data-testid="location-display">
                       <p className="text-sm font-semibold text-foreground">Your Selected Location</p>
                       <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          <span className="font-medium">Latitude:</span> {selectedLocation.latitude.toFixed(6)}°
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          <span className="font-medium">Longitude:</span> {selectedLocation.longitude.toFixed(6)}°
-                        </p>
+                        {isLoadingAddress ? (
+                          <p className="text-sm text-muted-foreground italic">Loading address...</p>
+                        ) : (
+                          <>
+                            {selectedAddress && (
+                              <p className="text-sm text-foreground font-medium bg-white/50 dark:bg-black/20 rounded p-2">
+                                {selectedAddress}
+                              </p>
+                            )}
+                            <p className="text-sm text-muted-foreground">
+                              <span className="font-medium">Latitude:</span> {selectedLocation.latitude.toFixed(6)}°
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              <span className="font-medium">Longitude:</span> {selectedLocation.longitude.toFixed(6)}°
+                            </p>
+                          </>
+                        )}
                       </div>
                       <div className="flex gap-2 pt-2">
                         <Badge variant="default" className="text-xs">✓ Location Confirmed</Badge>
