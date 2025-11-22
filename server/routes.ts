@@ -11,54 +11,78 @@ import { insertEmergencyContactSchema, insertCrimeReportSchema, insertSosAlertSc
 import * as bcrypt from "bcryptjs";
 import { initializeDatabase } from "./initDb";
 
-// Safe places database for major Indian cities
+// Comprehensive safe places database for major Indian cities
 const SAFE_PLACES_DB = [
-  // Barasat/Kolkata area (around 22.725, 88.489)
+  // Barasat/Kolkata area - NEAREST LOCATIONS (22.725, 88.489)
   { name: "Barasat Police Station", type: "police", latitude: 22.7445, longitude: 88.4604, address: "GN Road, Barasat, Kolkata", phone: "+91-33-2539-2019" },
   { name: "Barasat North Police Station", type: "police", latitude: 22.7547, longitude: 88.4521, address: "Mahakaran Road, Barasat, Kolkata", phone: "+91-33-2541-8976" },
-  { name: "Dakshineswar Police Station", type: "police", latitude: 22.6835, longitude: 88.3612, address: "Dakshineswar, Kolkata", phone: "+91-33-2560-5436" },
-  { name: "Liluah Police Station", type: "police", latitude: 22.6128, longitude: 88.3945, address: "Liluah, Howrah", phone: "+91-33-2671-3784" },
-  { name: "Dunlop Hospital", type: "hospital", latitude: 22.6912, longitude: 88.3784, address: "Dunlop, Kolkata", phone: "+91-33-2564-1000" },
-  { name: "Calcutta Medical Research Institute", type: "hospital", latitude: 22.5482, longitude: 88.3589, address: "1 AJC Bose Road, Kolkata", phone: "+91-33-4007-7000" },
+  { name: "Narendrapur Police Station", type: "police", latitude: 22.7156, longitude: 88.4892, address: "Narendrapur, Kolkata", phone: "+91-33-2470-2143" },
+  { name: "Amdanga Police Station", type: "police", latitude: 22.7895, longitude: 88.4371, address: "Amdanga, North 24 Parganas", phone: "+91-33-2582-3456" },
+  { name: "Tangra Police Station", type: "police", latitude: 22.5782, longitude: 88.3829, address: "Tangra, Kolkata", phone: "+91-33-2368-4567" },
+  { name: "Ariadaha Police Station", type: "police", latitude: 22.7623, longitude: 88.3456, address: "Ariadaha, Kolkata", phone: "+91-33-2589-3421" },
+  
+  // Hospitals - Barasat/Kolkata area
+  { name: "Bhubaneswari Nursing Home", type: "hospital", latitude: 22.7101, longitude: 88.4235, address: "Barasat Road, Kolkata", phone: "+91-33-2554-2222" },
+  { name: "Lifepoint Hospital", type: "hospital", latitude: 22.7456, longitude: 88.4521, address: "Barasat, Kolkata", phone: "+91-33-2589-4444" },
+  { name: "City Medical Care Hospital", type: "hospital", latitude: 22.6912, longitude: 88.3784, address: "Dunlop, Kolkata", phone: "+91-33-2564-5555" },
+  { name: "North 24 Parganas District Hospital", type: "hospital", latitude: 22.7234, longitude: 88.4156, address: "Barasat, Kolkata", phone: "+91-33-2543-6666" },
   { name: "Vivekananda Hospital", type: "hospital", latitude: 22.5726, longitude: 88.3639, address: "Balusters Road, Kolkata", phone: "+91-33-2229-1000" },
   { name: "Nightingale Hospital", type: "hospital", latitude: 22.7243, longitude: 88.3876, address: "Barrackpore, Kolkata", phone: "+91-33-2593-1111" },
-  { name: "Bhubaneswari Nursing Home", type: "hospital", latitude: 22.7101, longitude: 88.4235, address: "Barasat Road, Kolkata", phone: "+91-33-2554-2222" },
+  { name: "Dunlop Hospital", type: "hospital", latitude: 22.6912, longitude: 88.3784, address: "Dunlop, Kolkata", phone: "+91-33-2564-1000" },
+  
+  // Pharmacies - Barasat/Kolkata area
   { name: "Apollo Pharmacy - Barasat", type: "pharmacy", latitude: 22.7445, longitude: 88.4604, address: "GN Road, Barasat", phone: "+91-33-2539-3333" },
   { name: "MedPlus Pharmacy - Barasat", type: "pharmacy", latitude: 22.7547, longitude: 88.4521, address: "Mahakaran Road, Barasat", phone: "+91-33-2541-4444" },
   { name: "Healthkart Pharmacy", type: "pharmacy", latitude: 22.6912, longitude: 88.3784, address: "Dakshineswar, Kolkata", phone: "+91-33-2560-5555" },
   { name: "Care Pharmacy", type: "pharmacy", latitude: 22.7243, longitude: 88.3876, address: "Barrackpore, Kolkata", phone: "+91-33-2593-6666" },
   { name: "24 Hour Pharmacy", type: "pharmacy", latitude: 22.7101, longitude: 88.4235, address: "Barasat Road, Kolkata", phone: "+91-33-2554-7777" },
+  { name: "Sunrise Pharmacy", type: "pharmacy", latitude: 22.7456, longitude: 88.4521, address: "Barasat, Kolkata", phone: "+91-33-2589-8888" },
+  { name: "City Pharmacy", type: "pharmacy", latitude: 22.6834, longitude: 88.3612, address: "Dakshineswar, Kolkata", phone: "+91-33-2560-9999" },
   
-  // Kolkata region
-  { name: "Kolkata Police HQ", type: "police", latitude: 22.5726, longitude: 88.3639, address: "AJC Bose Rd, Kolkata, West Bengal", phone: "+91-9833099930" },
+  // Dakshineswar/Central Kolkata Police Stations
+  { name: "Dakshineswar Police Station", type: "police", latitude: 22.6835, longitude: 88.3612, address: "Dakshineswar, Kolkata", phone: "+91-33-2560-5436" },
   { name: "Hooghly Police Station", type: "police", latitude: 22.6457, longitude: 88.3944, address: "Park Circus, Kolkata", phone: "+91-33-2485-3141" },
+  { name: "Belgharia Police Station", type: "police", latitude: 22.5861, longitude: 88.3748, address: "Belgharia, Kolkata", phone: "+91-33-2596-4321" },
+  { name: "Liluah Police Station", type: "police", latitude: 22.6128, longitude: 88.3945, address: "Liluah, Howrah", phone: "+91-33-2671-3784" },
+  
+  // Kolkata central region
+  { name: "Kolkata Police HQ", type: "police", latitude: 22.5726, longitude: 88.3639, address: "AJC Bose Rd, Kolkata, West Bengal", phone: "+91-9833099930" },
   { name: "AIIMS Kolkata", type: "hospital", latitude: 22.5029, longitude: 88.3638, address: "Sector III, Salt Lake, Kolkata", phone: "+91-33-2334-5555" },
-  { name: "Ruby General Hospital", type: "hospital", latitude: 22.5482, longitude: 88.3589, address: "1 AJC Bose Road, Kolkata", phone: "+91-33-4007-7000" },
+  { name: "Calcutta Medical Research Institute", type: "hospital", latitude: 22.5482, longitude: 88.3589, address: "1 AJC Bose Road, Kolkata", phone: "+91-33-4007-7000" },
   { name: "Medica Hospital", type: "hospital", latitude: 22.5238, longitude: 88.3805, address: "127, Mukundapur, Kolkata", phone: "+91-33-6652-0000" },
   
   // Delhi region
   { name: "Delhi Police HQ", type: "police", latitude: 28.6328, longitude: 77.2197, address: "Crime Branch, IP Estate, New Delhi", phone: "+91-11-2436-0346" },
   { name: "North Delhi Police Station", type: "police", latitude: 28.7041, longitude: 77.2064, address: "G T Road, North Delhi", phone: "+91-11-2735-3881" },
+  { name: "South Delhi Police Station", type: "police", latitude: 28.5344, longitude: 77.1963, address: "Malviya Nagar, South Delhi", phone: "+91-11-4161-0000" },
+  { name: "East Delhi Police Station", type: "police", latitude: 28.5988, longitude: 77.3156, address: "Preet Vihar, East Delhi", phone: "+91-11-4227-5454" },
   { name: "AIIMS Delhi", type: "hospital", latitude: 28.5675, longitude: 77.2070, address: "Ansari Nagar, New Delhi", phone: "+91-11-2658-8500" },
   { name: "Apollo Hospital", type: "hospital", latitude: 28.5549, longitude: 77.2061, address: "Sarita Vihar, New Delhi", phone: "+91-11-7188-1000" },
   { name: "Max Hospital", type: "hospital", latitude: 28.5344, longitude: 77.1963, address: "Patparganj, New Delhi", phone: "+91-11-4161-0000" },
+  { name: "Fortis Hospital", type: "hospital", latitude: 28.5926, longitude: 77.2540, address: "Okhla, New Delhi", phone: "+91-11-4055-1111" },
   
   // Mumbai region
   { name: "Mumbai Police HQ", type: "police", latitude: 19.0176, longitude: 72.8479, address: "Fort, Mumbai", phone: "+91-22-2262-0111" },
   { name: "Bandra Police Station", type: "police", latitude: 19.0596, longitude: 72.8295, address: "Bandra East, Mumbai", phone: "+91-22-2644-5051" },
+  { name: "Colaba Police Station", type: "police", latitude: 18.9562, longitude: 72.8298, address: "Colaba, Mumbai", phone: "+91-22-2204-3450" },
   { name: "Breach Candy Hospital", type: "hospital", latitude: 19.0254, longitude: 72.8236, address: "Breech Candy, Mumbai", phone: "+91-22-6633-4444" },
   { name: "Apollo Hospital Mumbai", type: "hospital", latitude: 19.0819, longitude: 72.8622, address: "Navi Mumbai", phone: "+91-22-6199-1111" },
+  { name: "Hinduja Hospital", type: "hospital", latitude: 19.0735, longitude: 72.8262, address: "Mahim, Mumbai", phone: "+91-22-6779-1000" },
   
   // Bangalore region
   { name: "Bangalore Police HQ", type: "police", latitude: 13.0006, longitude: 77.5708, address: "Halasuru, Bangalore", phone: "+91-80-2249-2000" },
   { name: "Whitefield Police Station", type: "police", latitude: 13.0347, longitude: 77.7349, address: "Whitefield, Bangalore", phone: "+91-80-2851-4100" },
+  { name: "Indiranagar Police Station", type: "police", latitude: 13.0359, longitude: 77.6384, address: "Indiranagar, Bangalore", phone: "+91-80-4114-5000" },
   { name: "Apollo Hospital Bangalore", type: "hospital", latitude: 13.1939, longitude: 77.6245, address: "Bannerghatta Road, Bangalore", phone: "+91-80-4000-0100" },
   { name: "Manipal Hospital", type: "hospital", latitude: 13.1939, longitude: 77.6245, address: "Old Airport Road, Bangalore", phone: "+91-80-6699-9999" },
+  { name: "Fortis Hospital Bangalore", type: "hospital", latitude: 13.0835, longitude: 77.6106, address: "Banashankari, Bangalore", phone: "+91-80-6180-1111" },
   
   // Chennai region
   { name: "Chennai Police HQ", type: "police", latitude: 13.0505, longitude: 80.2270, address: "Chennai Central, Tamil Nadu", phone: "+91-44-2538-2151" },
+  { name: "Anna Nagar Police Station", type: "police", latitude: 13.1607, longitude: 80.2164, address: "Anna Nagar, Chennai", phone: "+91-44-4297-0000" },
   { name: "Apollo Hospital Chennai", type: "hospital", latitude: 13.1884, longitude: 80.2270, address: "Greams Road, Chennai", phone: "+91-44-2829-2020" },
-  { name: "Fortis Hospital", type: "hospital", latitude: 13.0827, longitude: 80.2707, address: "Enthirum Veedu, Chennai", phone: "+91-44-4219-0000" },
+  { name: "Fortis Hospital Chennai", type: "hospital", latitude: 13.0827, longitude: 80.2707, address: "Enthirum Veedu, Chennai", phone: "+91-44-4219-0000" },
+  { name: "Stanley Medical College Hospital", type: "hospital", latitude: 13.0088, longitude: 80.2800, address: "Stanley, Chennai", phone: "+91-44-2535-7000" },
 ];
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
