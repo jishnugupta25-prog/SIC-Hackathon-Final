@@ -55,15 +55,19 @@ export default function CrimeMap() {
   }, [isAuthenticated, authLoading, toast]);
 
   useEffect(() => {
+    // Fallback location (center of India)
+    const fallbackLocation = { latitude: 20.5937, longitude: 78.9629 };
+
     if (!navigator.geolocation) {
-      console.warn("Geolocation not available");
+      console.warn("Geolocation not available, using fallback location");
+      setLocation(fallbackLocation);
       return;
     }
 
     const options = {
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 0,
+      enableHighAccuracy: false, // Disable high accuracy to avoid timeouts
+      timeout: 60000, // Increase timeout to 60 seconds
+      maximumAge: 60000, // Use cached position if available (60 seconds)
     };
 
     console.log("Requesting crime map location...");
@@ -83,6 +87,8 @@ export default function CrimeMap() {
           error.code,
           error.message,
         );
+        console.log("Using fallback location for crime map");
+        setLocation(fallbackLocation);
       },
       options,
     );

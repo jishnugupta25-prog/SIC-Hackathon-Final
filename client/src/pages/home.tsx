@@ -108,30 +108,27 @@ export default function Home() {
     },
   });
 
-  // Get current location with improved accuracy and logging
+  // Get current location with fallback
   useEffect(() => {
+    // Fallback location (center of India)
+    const fallbackLocation = { latitude: 20.5937, longitude: 78.9629 };
+
     if (!navigator.geolocation) {
-      console.warn("Geolocation not available");
+      console.warn("Geolocation not available, using fallback location");
+      setLocation(fallbackLocation);
       return;
     }
 
     const options = {
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 30000, // Use cached position if available (30 seconds) to avoid poor accuracy readings
+      enableHighAccuracy: false, // Disable high accuracy to avoid timeouts
+      timeout: 60000, // Increase timeout to 60 seconds
+      maximumAge: 60000, // Use cached position if available (60 seconds)
     };
 
     console.log("Requesting SOS location...");
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        // Filter out readings with extremely poor accuracy (>50km is unrealistic)
-        const accuracy = Math.round(position.coords.accuracy);
-        if (accuracy > 50000) {
-          console.warn(`[GPS] Ignoring SOS reading with poor accuracy: ±${accuracy}m`);
-          return;
-        }
-        
         const newLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -141,6 +138,8 @@ export default function Home() {
       },
       (error) => {
         console.error("Geolocation error for SOS:", error.code, error.message);
+        console.log("Using fallback location for SOS");
+        setLocation(fallbackLocation);
       },
       options
     );
