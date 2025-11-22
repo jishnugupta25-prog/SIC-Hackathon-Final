@@ -533,20 +533,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = data.features[0];
       const properties = result.properties || {};
       
-      // Build place name prioritizing city/state for accuracy
-      // If we have city and state, use those for accuracy (avoid specific building names)
+      // Build place name with proper priority for exact location
+      // Priority: name (exact place like hospital) > locality/district > city > state > country
       const parts = [];
-      if (properties.city) parts.push(properties.city);
-      if (properties.state) parts.push(properties.state);
-      if (properties.country) parts.push(properties.country);
+      
+      // Prefer specific location names (buildings, localities)
+      if (properties.name && properties.name.length > 3) {
+        parts.push(properties.name);
+      }
+      
+      // Add district/locality for geographic accuracy
+      if (properties.district) parts.push(properties.district);
+      else if (properties.locality && properties.locality !== properties.name) parts.push(properties.locality);
+      
+      // Add city
+      if (properties.city && !parts.includes(properties.city)) parts.push(properties.city);
+      
+      // Add state
+      if (properties.state && !parts.includes(properties.state)) parts.push(properties.state);
+      
+      // Add country as fallback
+      if (properties.country && !parts.includes(properties.country)) parts.push(properties.country);
       
       const placeName = parts.length > 0 ? parts.join(', ') : 'My Location';
       
-      // Build hierarchy: city -> state -> country (for location accuracy)
+      // Build hierarchy: locality/city -> district -> state -> country
       const hierarchy: string[] = [];
-      if (properties.city) hierarchy.push(properties.city);
-      if (properties.state && properties.state !== properties.city) hierarchy.push(properties.state);
-      if (properties.country) hierarchy.push(properties.country);
+      if (properties.locality && !hierarchy.includes(properties.locality)) hierarchy.push(properties.locality);
+      if (properties.city && properties.city !== properties.locality && !hierarchy.includes(properties.city)) hierarchy.push(properties.city);
+      if (properties.district && !hierarchy.includes(properties.district)) hierarchy.push(properties.district);
+      if (properties.state && !hierarchy.includes(properties.state)) hierarchy.push(properties.state);
+      if (properties.country && !hierarchy.includes(properties.country)) hierarchy.push(properties.country);
 
       console.log(`[Reverse Geocode] ✓ Success: ${numLat},${numLon} -> ${placeName}`);
       
@@ -809,30 +826,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn(`[Safe Places] Overpass API failed:`, error.message);
       }
 
-      // Fallback to hardcoded database if Overpass returns few results
-      if (allPlaces.length < 3) {
-        console.log(`[Safe Places] Low results (${allPlaces.length}), using hardcoded database as fallback...`);
+      // Always supplement with hardcoded database to ensure comprehensive results
+      console.log(`[Safe Places] Supplementing with hardcoded database (${allPlaces.length} from Overpass)...`);
+      
+      for (const place of SAFE_PLACES_DB) {
+        const distance = calculateDistance(userLat, userLon, place.latitude, place.longitude);
         
-        for (const place of SAFE_PLACES_DB) {
-          const distance = calculateDistance(userLat, userLon, place.latitude, place.longitude);
-          
-          if (distance <= radius) {
-            const placeId = `db-${place.name}`;
-            if (!seenPlaces.has(placeId)) {
-              seenPlaces.add(placeId);
-              allPlaces.push({
-                id: placeId,
-                name: place.name,
-                type: place.type,
-                latitude: place.latitude,
-                longitude: place.longitude,
-                address: place.address,
-                phone: place.phone,
-                distance: Math.round(distance * 100) / 100,
-                rating: 0,
-                isOpen: undefined
-              });
-            }
+        if (distance <= radius) {
+          const placeId = `db-${place.name}`;
+          if (!seenPlaces.has(placeId)) {
+            seenPlaces.add(placeId);
+            allPlaces.push({
+              id: placeId,
+              name: place.name,
+              type: place.type,
+              latitude: place.latitude,
+              longitude: place.longitude,
+              address: place.address,
+              phone: place.phone,
+              distance: Math.round(distance * 100) / 100,
+              rating: 0,
+              isOpen: undefined
+            });
           }
         }
       }
