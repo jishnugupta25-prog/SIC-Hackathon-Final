@@ -155,10 +155,11 @@ export default function CrimeMap() {
         <div style="position: absolute; width: 24px; height: 24px; background: #3b82f6; border: 4px solid #1e40af; border-radius: 50%; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 10; box-shadow: 0 0 0 10px rgba(59, 130, 246, 0.15);"></div>
         ${positions.map((pos) => {
           const bgColor = color(pos.crime.crimeType);
+          const googleMapsUrl = `https://www.google.com/maps?q=${pos.crime.latitude},${pos.crime.longitude}`;
           return `
-            <div style="position: absolute; left: ${pos.x}%; top: ${pos.y}%; z-index: 5; transform: translate(-50%, -50%);">
+            <div style="position: absolute; left: ${pos.x}%; top: ${pos.y}%; z-index: 5; transform: translate(-50%, -50%);" class="crime-marker" data-lat="${pos.crime.latitude}" data-lon="${pos.crime.longitude}" data-url="${googleMapsUrl}">
               <div style="position: relative; width: 28px; height: 28px; cursor: pointer; transition: all 0.3s ease;">
-                <div style="position: absolute; width: 28px; height: 28px; background: ${bgColor}; border: 3px solid ${bgColor}; border-radius: 50%; box-shadow: 0 0 0 3px white, 0 2px 8px rgba(0,0,0,0.2); transition: all 0.3s;" onmouseover="this.style.transform='scale(1.4)'; this.style.zIndex='20'; this.style.boxShadow='0 0 0 3px white, 0 4px 12px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 0 0 3px white, 0 2px 8px rgba(0,0,0,0.2)';"></div>
+                <div style="position: absolute; width: 28px; height: 28px; background: ${bgColor}; border: 3px solid ${bgColor}; border-radius: 50%; box-shadow: 0 0 0 3px white, 0 2px 8px rgba(0,0,0,0.2); transition: all 0.3s; cursor: pointer;" onmouseover="this.style.transform='scale(1.4)'; this.style.zIndex='20'; this.style.boxShadow='0 0 0 3px white, 0 4px 12px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 0 0 3px white, 0 2px 8px rgba(0,0,0,0.2)';"></div>
                 <div style="position: absolute; width: 24px; height: 24px; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: white; z-index: 6; pointer-events: none;">${pos.idx + 1}</div>
                 <div style="position: absolute; top: -30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: white; padding: 4px 8px; border-radius: 4px; white-space: nowrap; font-size: 11px; font-weight: 500; pointer-events: none; opacity: 0; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0'">${pos.crime.crimeType}</div>
               </div>
@@ -180,7 +181,7 @@ export default function CrimeMap() {
     
     container.innerHTML = html;
     
-    // Attach legend toggle functionality after DOM is rendered
+    // Attach legend toggle functionality and crime marker click handlers after DOM is rendered
     setTimeout(() => {
       const toggleBtn = document.getElementById("legend-toggle");
       const legendContent = document.getElementById("legend-content");
@@ -191,6 +192,18 @@ export default function CrimeMap() {
           toggleBtn.textContent = isHidden ? "▲" : "▼";
         });
       }
+
+      // Add click handlers to crime markers
+      const markers = document.querySelectorAll(".crime-marker");
+      markers.forEach((marker) => {
+        marker.addEventListener("click", function (e) {
+          e.stopPropagation();
+          const googleMapsUrl = this.getAttribute("data-url");
+          if (confirm("Open Google Maps at this crime location?")) {
+            window.open(googleMapsUrl, "_blank");
+          }
+        });
+      });
     }, 0);
   }, [location, crimes]);
 
