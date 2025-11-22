@@ -165,12 +165,11 @@ export default function CrimeMap() {
             </div>
           `;
         }).join('')}
-        <button id="legend-toggle" style="position: absolute; top: 12px; left: 12px; background: white; border: 1px solid #ddd; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; color: #333; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 15; transition: all 0.2s;">▼ Legend</button>
-        <div id="legend-content" style="position: absolute; top: 48px; left: 12px; background: white; padding: 10px 12px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 15; max-height: 350px; overflow-y: auto; display: none; width: 180px;">
-          <div style="font-weight: 600; font-size: 13px; margin-bottom: 8px; color: #333;">Crime Types</div>
+        <button id="legend-toggle" style="position: absolute; top: 12px; left: 12px; background: white; border: 1px solid #ddd; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 12px; color: #333; box-shadow: 0 2px 6px rgba(0,0,0,0.12); z-index: 15; transition: all 0.2s; height: fit-content;">▼</button>
+        <div id="legend-content" style="position: absolute; top: 44px; left: 12px; background: white; padding: 8px 10px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 15; border: 1px solid #ddd; display: none; width: 160px; min-width: 160px;">
           ${legendItems.map((item) => `
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; color: #555;">
-              <div style="width: 16px; height: 16px; background-color: ${item.color}; border: 2px solid ${item.color}; border-radius: 50%; flex-shrink: 0;"></div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 11px; color: #555; padding: 4px 0;">
+              <div style="width: 14px; height: 14px; background-color: ${item.color}; border: 2px solid ${item.color}; border-radius: 50%; flex-shrink: 0;"></div>
               <span>${item.type}</span>
             </div>
           `).join('')}
@@ -184,7 +183,7 @@ export default function CrimeMap() {
           toggleBtn.addEventListener('click', function() {
             const isHidden = legendContent.style.display === 'none';
             legendContent.style.display = isHidden ? 'block' : 'none';
-            toggleBtn.textContent = isHidden ? '▲ Legend' : '▼ Legend';
+            toggleBtn.textContent = isHidden ? '▲' : '▼';
           });
         }
       </script>
