@@ -11,11 +11,20 @@ import type { CrimeReport } from "@shared/schema";
 export default function CrimeMap() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const mapRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedCrime, setSelectedCrime] = useState<CrimeReport | null>(null);
-  const [mapLoaded, setMapLoaded] = useState(false);
+
+  const { data: crimes = [], isLoading, isError } = useQuery<CrimeReport[]>({
+    queryKey: ["/api/crimes"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: aiInsights, isLoading: aiLoading, isError: aiError } = useQuery<{ analysis: string; recommendations: string[] }>({
+    queryKey: ["/api/ai/crime-analysis"],
+    enabled: isAuthenticated && crimes.length > 0,
+  });
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -62,33 +71,17 @@ export default function CrimeMap() {
     );
   }, []);
 
-  // Load Google Maps script
+  // Load Google Maps script once
   useEffect(() => {
-    if (mapLoaded) return;
-    
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    if (!apiKey) {
-      console.warn("Google Maps API key not configured");
-      return;
-    }
+    if (!apiKey || window.google) return;
 
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
     script.async = true;
     script.defer = true;
-    script.onload = () => setMapLoaded(true);
     document.head.appendChild(script);
-  }, [mapLoaded]);
-
-  const { data: crimes = [], isLoading, isError } = useQuery<CrimeReport[]>({
-    queryKey: ["/api/crimes"],
-    enabled: isAuthenticated,
-  });
-
-  const { data: aiInsights, isLoading: aiLoading, isError: aiError } = useQuery<{ analysis: string; recommendations: string[] }>({
-    queryKey: ["/api/ai/crime-analysis"],
-    enabled: isAuthenticated && crimes.length > 0,
-  });
+  }, []);
 
   const getCrimeTypeColor = (type: string) => {
     const colors: Record<string, string> = {
@@ -136,28 +129,28 @@ export default function CrimeMap() {
 
   // Initialize and update map with crime markers
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current || crimes.length === 0) return;
+    if (!window.google || !mapRef.current || crimes.length === 0) return;
 
     const mapElement = document.getElementById("crime-map-container");
     if (!mapElement) return;
 
     // Clear existing markers
-    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current.forEach((marker: any) => marker.setMap(null));
     markersRef.current = [];
 
     // Calculate bounds to fit all crimes
-    const bounds = new google.maps.LatLngBounds();
+    const bounds = new (window as any).google.maps.LatLngBounds();
     
     crimes.forEach((crime) => {
       const position = { lat: crime.latitude, lng: crime.longitude };
       bounds.extend(position);
 
-      const marker = new google.maps.Marker({
+      const marker = new (window as any).google.maps.Marker({
         position,
         map: mapRef.current,
         title: crime.crimeType,
         icon: {
-          path: google.maps.SymbolPath.CIRCLE,
+          path: (window as any).google.maps.SymbolPath.CIRCLE,
           scale: 8,
           fillColor: crime.crimeType === "Assault" || crime.crimeType === "Harassment" ? "#ef4444" : 
                      crime.crimeType === "Robbery" ? "#f97316" :
@@ -180,25 +173,25 @@ export default function CrimeMap() {
       mapRef.current.setCenter({ lat: location.latitude, lng: location.longitude });
       mapRef.current.setZoom(12);
     }
-  }, [mapLoaded, crimes, location]);
+  }, [crimes, location]);
 
   // Initialize map on first load
   useEffect(() => {
-    if (!mapLoaded) return;
+    if (!window.google) return;
 
     const mapElement = document.getElementById("crime-map-container");
     if (!mapElement || mapRef.current) return;
 
     const defaultLocation = location || { latitude: 20.5937, longitude: 78.9629 };
     
-    mapRef.current = new google.maps.Map(mapElement, {
+    mapRef.current = new (window as any).google.maps.Map(mapElement, {
       zoom: 12,
       center: { lat: defaultLocation.latitude, lng: defaultLocation.longitude },
       mapTypeControl: true,
       fullscreenControl: true,
       zoomControl: true,
     });
-  }, [mapLoaded, location]);
+  }, [location]);
 
   if (isError) {
     return (
@@ -230,16 +223,7 @@ export default function CrimeMap() {
         <div className="md:col-span-2 space-y-4">
           <Card>
             <CardContent className="p-6">
-              {!mapLoaded ? (
-                <div className="aspect-video bg-muted rounded-md flex items-center justify-center mb-4">
-                  <div className="text-center space-y-2">
-                    <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="text-sm text-muted-foreground">Loading map...</p>
-                  </div>
-                </div>
-              ) : (
-                <div id="crime-map-container" className="aspect-video bg-muted rounded-md mb-4" style={{ height: "400px" }} />
-              )}
+              <div id="crime-map-container" className="bg-muted rounded-md mb-4" style={{ height: "400px" }} />
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-primary" />
