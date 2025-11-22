@@ -120,9 +120,9 @@ export default function Home() {
     }
 
     const options = {
-      enableHighAccuracy: false, // Disable high accuracy to avoid timeouts
-      timeout: 60000, // Increase timeout to 60 seconds
-      maximumAge: 60000, // Use cached position if available (60 seconds)
+      enableHighAccuracy: true, // Enable high accuracy for ±2-3 meters precision
+      timeout: 15000, // 15 seconds for high accuracy
+      maximumAge: 5000, // Use cached position if fresh
     };
 
     console.log("Requesting SOS location...");
