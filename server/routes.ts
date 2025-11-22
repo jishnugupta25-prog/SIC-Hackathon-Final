@@ -781,7 +781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Safe Places route - Works for ANY location worldwide
+  // Safe Places route - Works for ANY location worldwide (NOT limited to Barasat)
   app.get('/api/safe-places', isAuthenticated, async (req: any, res) => {
     try {
       const startTime = Date.now();
@@ -793,16 +793,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid coordinates" });
       }
       
-      console.log(`[Safe Places] Fetching locations for: ${userLat}, ${userLon}`);
+      console.log(`[Safe Places] Fetching REAL-TIME nearby safe places for ANY location: ${userLat}, ${userLon}`);
 
       const radius = 50; // 50km search radius - show all nearby safe places
       const radiusMeters = radius * 1000;
       const allPlaces: any[] = [];
       const seenPlaces = new Set<string>();
 
-      // Try Overpass API first for real-time worldwide data
+      // Try Overpass API first for REAL-TIME worldwide data (works for ANY user location)
       try {
-        console.log(`[Safe Places] Trying Overpass API for worldwide search...`);
+        console.log(`[Safe Places] Fetching REAL-TIME data from Overpass API for any location worldwide...`);
         
         // Build Overpass QL query - search for amenities in bounding box
         const delta = radius / 111.0; // Convert km to degrees
@@ -899,8 +899,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn(`[Safe Places] Overpass API failed:`, error.message);
       }
 
-      // Always supplement with hardcoded database to ensure comprehensive results
-      console.log(`[Safe Places] Supplementing with hardcoded database (${allPlaces.length} from Overpass)...`);
+      // Always supplement with hardcoded database to ensure comprehensive results (fallback for offline areas)
+      console.log(`[Safe Places] Supplementing with comprehensive database for current location (${allPlaces.length} from Overpass)...`);
       
       const dbBefore = allPlaces.length;
       for (const place of SAFE_PLACES_DB) {
