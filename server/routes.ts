@@ -323,7 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return R * c; // Distance in kilometers
   };
 
-  // Get location suggestions as user types (worldwide search)
+  // Get location suggestions as user types (worldwide search) with retry
   app.get('/api/suggestions', isAuthenticated, async (req: any, res) => {
     try {
       const query = req.query.q as string;
@@ -331,31 +331,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json([]);
       }
 
-      // Search worldwide - no viewbox restriction
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8`;
-      
-      // Add timeout with AbortController
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout for suggestions
-      
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'CrimeReportPortal/1.0'
-        },
-        signal: controller.signal
-      });
+      // Helper function to fetch with retry
+      const fetchWithRetry = async (maxRetries: number = 2): Promise<any> => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8`;
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout per attempt
+            
+            const response = await fetch(url, {
+              headers: {
+                'User-Agent': 'CrimeReportPortal/1.0',
+                'Accept': 'application/json'
+              },
+              signal: controller.signal
+            });
 
-      clearTimeout(timeoutId);
+            clearTimeout(timeoutId);
 
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.warn("[Suggestions] Invalid content type:", contentType);
-        return res.json([]);
-      }
+            if (!response.ok) {
+              console.warn(`[Suggestions] Attempt ${attempt}: HTTP ${response.status}`);
+              if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 200));
+                continue;
+              }
+              throw new Error(`HTTP ${response.status}`);
+            }
 
-      const data = await response.json();
-      if (!data || !Array.isArray(data)) {
-        console.warn("[Suggestions] Response not an array");
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+              console.warn(`[Suggestions] Attempt ${attempt}: Invalid content type`, contentType);
+              if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 200));
+                continue;
+              }
+              throw new Error("Invalid content type");
+            }
+
+            const data = await response.json();
+            if (!Array.isArray(data)) {
+              console.warn(`[Suggestions] Attempt ${attempt}: Response not an array`);
+              if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 200));
+                continue;
+              }
+              throw new Error("Invalid response format");
+            }
+
+            console.log(`[Suggestions] ✓ Success on attempt ${attempt}: Found ${data.length} results for "${query}"`);
+            return data;
+          } catch (error: any) {
+            console.warn(`[Suggestions] Attempt ${attempt} error:`, error.message);
+            if (attempt === maxRetries) {
+              throw error;
+            }
+            await new Promise(r => setTimeout(r, 200));
+          }
+        }
+        throw new Error("All retries failed");
+      };
+
+      let data;
+      try {
+        data = await fetchWithRetry(2);
+      } catch (error: any) {
+        console.warn("[Suggestions] All attempts failed:", error.message);
         return res.json([]);
       }
 
@@ -375,19 +416,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }).filter(Boolean);
 
-      console.log(`[Suggestions] Found ${suggestions.length} results for "${query}"`);
+      console.log(`[Suggestions] Found ${suggestions.length} valid results for "${query}"`);
       res.json(suggestions);
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.warn("[Suggestions] Request timeout for:", error.message);
-      } else {
-        console.error("[Suggestions] Error:", error.message);
-      }
+      console.error("[Suggestions] Unexpected error:", error.message);
       res.json([]);
     }
   });
 
-  // Reverse geocode - get place name from coordinates
+  // Reverse geocode - get place name from coordinates with retry
   app.get('/api/reverse-geocode', isAuthenticated, async (req: any, res) => {
     try {
       const lat = req.query.lat as string;
@@ -404,42 +441,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid coordinates" });
       }
 
-      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
-      
-      // Add timeout with AbortController
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-      
+      // Helper function to fetch with retry
+      const fetchWithRetry = async (maxRetries: number = 2): Promise<any> => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`;
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 second timeout per attempt
+            
+            const response = await fetch(url, {
+              headers: {
+                'User-Agent': 'CrimeReportPortal/1.0',
+                'Accept': 'application/json'
+              },
+              signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+              console.warn(`[Reverse Geocode] Attempt ${attempt}: HTTP ${response.status}`);
+              if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 300)); // Wait before retry
+                continue;
+              }
+              throw new Error(`HTTP ${response.status}`);
+            }
+
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+              console.warn(`[Reverse Geocode] Attempt ${attempt}: Invalid content type`, contentType);
+              if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 300)); // Wait before retry
+                continue;
+              }
+              throw new Error("Invalid content type");
+            }
+
+            const data = await response.json();
+            
+            if (!data || !data.display_name) {
+              console.warn(`[Reverse Geocode] Attempt ${attempt}: Empty or invalid data`);
+              if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 300)); // Wait before retry
+                continue;
+              }
+              throw new Error("Empty response");
+            }
+
+            console.log(`[Reverse Geocode] ✓ Success on attempt ${attempt}: ${lat}, ${lon}`);
+            return data;
+          } catch (error: any) {
+            console.warn(`[Reverse Geocode] Attempt ${attempt} error:`, error.message);
+            if (attempt === maxRetries) {
+              throw error;
+            }
+            await new Promise(r => setTimeout(r, 300));
+          }
+        }
+        throw new Error("All retries failed");
+      };
+
       let data;
       try {
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent': 'CrimeReportPortal/1.0'
-          },
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          console.warn("[Reverse Geocode] Invalid content type:", contentType);
-          throw new Error("Invalid content type");
-        }
-
-        data = await response.json();
-        
-        if (!data) {
-          throw new Error("Empty response");
-        }
-      } catch (fetchError: any) {
-        console.warn("[Reverse Geocode] Fetch failed, using fallback:", fetchError.message);
-        clearTimeout(timeoutId);
-        // Return fallback location name
+        data = await fetchWithRetry(2);
+      } catch (error: any) {
+        console.warn("[Reverse Geocode] All attempts failed, using fallback:", error.message);
+        // Return fallback with exact coordinates
+        const placeName = `Location (${lat}, ${lon})`;
+        console.log(`[Reverse Geocode] Fallback: ${placeName}`);
         return res.json({ 
-          placeName: "Current Location", 
+          placeName: placeName, 
           hierarchy: [],
-          isFallback: true 
+          isFallback: true,
+          latitude: numLat,
+          longitude: numLon
         });
       }
 
@@ -522,7 +599,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Geocode place name to coordinates
+  // Geocode place name to coordinates with retry
   app.get('/api/geocode', isAuthenticated, async (req: any, res) => {
     try {
       const placeName = req.query.place as string;
@@ -532,33 +609,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[Geocode] Searching for: ${placeName}`);
 
-      // Use OpenStreetMap Nominatim API with proper headers
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(placeName)}&format=json&limit=1`;
-      
-      // Add timeout with AbortController
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-      
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'CrimeReportPortal/1.0'
-        },
-        signal: controller.signal
-      });
+      // Helper function to fetch with retry
+      const fetchWithRetry = async (maxRetries: number = 2): Promise<any> => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(placeName)}&format=json&limit=1`;
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 second timeout per attempt
+            
+            const response = await fetch(url, {
+              headers: {
+                'User-Agent': 'CrimeReportPortal/1.0',
+                'Accept': 'application/json'
+              },
+              signal: controller.signal
+            });
 
-      clearTimeout(timeoutId);
+            clearTimeout(timeoutId);
 
-      const contentType = response.headers.get('content-type');
+            if (!response.ok) {
+              console.warn(`[Geocode] Attempt ${attempt}: HTTP ${response.status}`);
+              if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+              }
+              throw new Error(`HTTP ${response.status}`);
+            }
+
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+              console.warn(`[Geocode] Attempt ${attempt}: Invalid content type`, contentType);
+              if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+              }
+              throw new Error("Invalid content type");
+            }
+
+            const data = await response.json();
+            
+            if (!Array.isArray(data)) {
+              console.warn(`[Geocode] Attempt ${attempt}: Response not an array`);
+              if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+              }
+              throw new Error("Invalid response format");
+            }
+
+            console.log(`[Geocode] ✓ Success on attempt ${attempt}: Found ${data.length} results`);
+            return data;
+          } catch (error: any) {
+            console.warn(`[Geocode] Attempt ${attempt} error:`, error.message);
+            if (attempt === maxRetries) {
+              throw error;
+            }
+            await new Promise(r => setTimeout(r, 300));
+          }
+        }
+        throw new Error("All retries failed");
+      };
+
       let data;
-
-      if (!contentType || !contentType.includes('application/json')) {
-        console.error(`[Geocode] Invalid content type: ${contentType}`);
-        const text = await response.text();
-        console.error(`[Geocode] Response body: ${text.substring(0, 200)}`);
-        return res.status(500).json({ message: "Geocoding service error" });
+      try {
+        data = await fetchWithRetry(2);
+      } catch (error: any) {
+        console.error("[Geocode] All attempts failed:", error.message);
+        return res.status(500).json({ message: "Geocoding service unavailable. Please try again." });
       }
-
-      data = await response.json();
 
       if (!data || !Array.isArray(data) || data.length === 0) {
         console.log(`[Geocode] No results found for: ${placeName}`);
