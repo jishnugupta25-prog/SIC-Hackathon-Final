@@ -50,10 +50,21 @@ export default function Home() {
     enabled: isAuthenticated,
   });
 
-  // Fetch recent crime reports
+  // Calculate safety score based on crime count
+  const calculateSafetyScore = (crimeCount: number) => {
+    if (crimeCount === 0) return { label: "Excellent", color: "text-chart-1" };
+    if (crimeCount <= 5) return { label: "Excellent", color: "text-chart-1" };
+    if (crimeCount <= 15) return { label: "Good", color: "text-chart-4" };
+    if (crimeCount <= 30) return { label: "Fair", color: "text-chart-2" };
+    return { label: "Poor", color: "text-destructive" };
+  };
+
+  // Fetch recent crime reports with polling for real-time updates
   const { data: recentCrimes = [] } = useQuery<CrimeReport[]>({
     queryKey: ["/api/crimes/recent"],
     enabled: isAuthenticated,
+    refetchInterval: 5000, // Poll every 5 seconds for real-time updates
+    refetchIntervalInBackground: true, // Keep polling even when tab is not focused
   });
 
   // SOS Alert mutation
@@ -267,8 +278,10 @@ export default function Home() {
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-chart-4">Good</div>
-            <p className="text-xs text-muted-foreground">Based on area data</p>
+            <div className={`text-2xl font-bold ${calculateSafetyScore(recentCrimes.length).color}`} data-testid="text-safety-score">
+              {calculateSafetyScore(recentCrimes.length).label}
+            </div>
+            <p className="text-xs text-muted-foreground">Based on {recentCrimes.length} crime{recentCrimes.length !== 1 ? 's' : ''}</p>
           </CardContent>
         </Card>
       </div>
