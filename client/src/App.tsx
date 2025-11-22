@@ -37,11 +37,11 @@ function Router() {
 function AppLayout() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Custom sidebar width for safety application
+  // Custom sidebar width and styling for safety application
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "4rem",
-  };
+  } as React.CSSProperties & Record<string, string>;
 
   if (isLoading) {
     return (
@@ -66,15 +66,15 @@ function AppLayout() {
   }
 
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full">
+    <SidebarProvider style={style}>
+      <div className="flex h-screen w-full bg-background">
         <AppSidebar />
         <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex items-center gap-4 border-b px-4 h-14 flex-shrink-0">
+          <header className="flex items-center gap-4 border-b px-6 h-16 flex-shrink-0 bg-white dark:bg-slate-950 shadow-sm">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex-1" />
           </header>
-          <main className="flex-1 overflow-y-auto p-6">
+          <main className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-background via-background to-background/95">
             <Router />
           </main>
         </div>

@@ -58,21 +58,21 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar>
-      <SidebarContent>
+    <Sidebar className="border-r-2 border-primary/20">
+      <SidebarContent className="pt-2">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-base font-heading font-bold flex items-center gap-2 px-2 py-4">
-            <Shield className="h-5 w-5" />
-            Crime Portal
+          <SidebarGroupLabel className="text-base font-heading font-bold flex items-center gap-2 px-4 py-6 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg mb-4">
+            <Shield className="h-6 w-6 text-primary" />
+            <span className="text-primary">Crime Portal</span>
           </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
+          <SidebarGroupContent className="px-3">
+            <SidebarMenu className="space-y-2">
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
+                  <SidebarMenuButton asChild isActive={location === item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`} className={`px-4 py-3 rounded-lg transition-all ${location === item.url ? 'bg-primary/15 text-primary font-semibold' : 'hover:bg-primary/5'}`}>
                     <Link href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <item.icon className="h-5 w-5" />
+                      <span className="font-medium">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -82,22 +82,22 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       
-      <SidebarFooter className="p-4">
-        <div className="flex items-center gap-3 mb-3">
-          <Avatar className="h-9 w-9">
+      <SidebarFooter className="px-4 py-4 border-t border-sidebar-border">
+        <div className="flex items-center gap-3 mb-4 p-3 bg-sidebar-accent/30 rounded-lg">
+          <Avatar className="h-10 w-10 ring-2 ring-primary/30">
             <AvatarImage src={user?.profileImageUrl || undefined} className="object-cover" />
-            <AvatarFallback>{getUserInitials()}</AvatarFallback>
+            <AvatarFallback className="bg-primary text-primary-foreground font-bold">{getUserInitials()}</AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate" data-testid="text-user-name">
+            <p className="text-sm font-semibold truncate" data-testid="text-user-name">
               {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email || "User"}
             </p>
             {user?.email && (
-              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              <p className="text-xs text-sidebar-foreground/60 truncate">{user.email}</p>
             )}
           </div>
         </div>
-        <Button variant="outline" className="w-full" asChild data-testid="button-logout">
+        <Button variant="outline" className="w-full hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50" asChild data-testid="button-logout">
           <a href="/api/auth/logout">
             <LogOut className="h-4 w-4 mr-2" />
             Sign Out
