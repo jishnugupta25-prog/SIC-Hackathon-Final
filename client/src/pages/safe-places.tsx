@@ -214,6 +214,12 @@ export default function SafePlaces() {
     requestLocationFn();
 
     // Watch for continuous location updates with 100m distance threshold
+    const watchOptions = {
+      enableHighAccuracy: true,
+      timeout: 5000,
+      maximumAge: 0,
+    };
+
     const watchId = navigator.geolocation.watchPosition(
       async (position) => {
         const currentLoc = {
@@ -268,7 +274,7 @@ export default function SafePlaces() {
       (error) => {
         console.error("[GPS] Watch error:", error.code);
       },
-      options
+      watchOptions
     );
 
     watchIdRef.current = watchId;
