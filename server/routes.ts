@@ -496,20 +496,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = data.features[0];
       const properties = result.properties || {};
       
-      // Build place name from properties
+      // Build place name prioritizing city/state for accuracy
+      // If we have city and state, use those for accuracy (avoid specific building names)
       const parts = [];
-      if (properties.name) parts.push(properties.name);
       if (properties.city) parts.push(properties.city);
       if (properties.state) parts.push(properties.state);
       if (properties.country) parts.push(properties.country);
       
       const placeName = parts.length > 0 ? parts.join(', ') : 'My Location';
       
-      // Build hierarchy
+      // Build hierarchy: city -> state -> country (for location accuracy)
       const hierarchy: string[] = [];
-      if (properties.name) hierarchy.push(properties.name);
-      if (properties.city && properties.city !== properties.name) hierarchy.push(properties.city);
-      if (properties.state) hierarchy.push(properties.state);
+      if (properties.city) hierarchy.push(properties.city);
+      if (properties.state && properties.state !== properties.city) hierarchy.push(properties.state);
       if (properties.country) hierarchy.push(properties.country);
 
       console.log(`[Reverse Geocode] ✓ Success: ${numLat},${numLon} -> ${placeName}`);
@@ -684,7 +683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Safe Places] Fetching locations for: ${userLat}, ${userLon}`);
 
-      const radius = 50; // 50km search radius
+      const radius = 10; // 10km search radius
       const allPlaces: any[] = [];
 
       // Search through database
