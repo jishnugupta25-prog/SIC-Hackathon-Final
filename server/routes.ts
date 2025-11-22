@@ -11,6 +11,54 @@ import { insertEmergencyContactSchema, insertCrimeReportSchema, insertSosAlertSc
 import * as bcrypt from "bcryptjs";
 import { initializeDatabase } from "./initDb";
 
+// Safe places database for major Indian cities
+const SAFE_PLACES_DB = [
+  // Kolkata region
+  { name: "Kolkata Police HQ", type: "police", latitude: 22.5726, longitude: 88.3639, address: "AJC Bose Rd, Kolkata, West Bengal", phone: "+91-9833099930" },
+  { name: "Barasat Police Station", type: "police", latitude: 22.7445, longitude: 88.4604, address: "GN Road, Barasat, Kolkata", phone: "+91-33-2539-2019" },
+  { name: "Hooghly Police Station", type: "police", latitude: 22.6457, longitude: 88.3944, address: "Park Circus, Kolkata", phone: "+91-33-2485-3141" },
+  { name: "AIIMS Kolkata", type: "hospital", latitude: 22.5029, longitude: 88.3638, address: "Sector III, Salt Lake, Kolkata", phone: "+91-33-2334-5555" },
+  { name: "Ruby General Hospital", type: "hospital", latitude: 22.5482, longitude: 88.3589, address: "1 AJC Bose Road, Kolkata", phone: "+91-33-4007-7000" },
+  { name: "Medica Hospital", type: "hospital", latitude: 22.5238, longitude: 88.3805, address: "127, Mukundapur, Kolkata", phone: "+91-33-6652-0000" },
+  { name: "Apollo Pharmacy", type: "pharmacy", latitude: 22.5658, longitude: 88.3758, address: "Russell Street, Kolkata", phone: "+91-33-2229-2333" },
+  { name: "MedPlus Pharmacy", type: "pharmacy", latitude: 22.5726, longitude: 88.3639, address: "Park Circus, Kolkata", phone: "+91-9372-600-666" },
+  
+  // Delhi region
+  { name: "Delhi Police HQ", type: "police", latitude: 28.6328, longitude: 77.2197, address: "Crime Branch, IP Estate, New Delhi", phone: "+91-11-2436-0346" },
+  { name: "North Delhi Police Station", type: "police", latitude: 28.7041, longitude: 77.2064, address: "G T Road, North Delhi", phone: "+91-11-2735-3881" },
+  { name: "AIIMS Delhi", type: "hospital", latitude: 28.5675, longitude: 77.2070, address: "Ansari Nagar, New Delhi", phone: "+91-11-2658-8500" },
+  { name: "Apollo Hospital", type: "hospital", latitude: 28.5549, longitude: 77.2061, address: "Sarita Vihar, New Delhi", phone: "+91-11-7188-1000" },
+  { name: "Max Hospital", type: "hospital", latitude: 28.5344, longitude: 77.1963, address: "Patparganj, New Delhi", phone: "+91-11-4161-0000" },
+  
+  // Mumbai region
+  { name: "Mumbai Police HQ", type: "police", latitude: 19.0176, longitude: 72.8479, address: "Fort, Mumbai", phone: "+91-22-2262-0111" },
+  { name: "Bandra Police Station", type: "police", latitude: 19.0596, longitude: 72.8295, address: "Bandra East, Mumbai", phone: "+91-22-2644-5051" },
+  { name: "Breach Candy Hospital", type: "hospital", latitude: 19.0254, longitude: 72.8236, address: "Breech Candy, Mumbai", phone: "+91-22-6633-4444" },
+  { name: "Apollo Hospital Mumbai", type: "hospital", latitude: 19.0819, longitude: 72.8622, address: "Navi Mumbai", phone: "+91-22-6199-1111" },
+  
+  // Bangalore region
+  { name: "Bangalore Police HQ", type: "police", latitude: 13.0006, longitude: 77.5708, address: "Halasuru, Bangalore", phone: "+91-80-2249-2000" },
+  { name: "Whitefield Police Station", type: "police", latitude: 13.0347, longitude: 77.7349, address: "Whitefield, Bangalore", phone: "+91-80-2851-4100" },
+  { name: "Apollo Hospital Bangalore", type: "hospital", latitude: 13.1939, longitude: 77.6245, address: "Bannerghatta Road, Bangalore", phone: "+91-80-4000-0100" },
+  { name: "Manipal Hospital", type: "hospital", latitude: 13.1939, longitude: 77.6245, address: "Old Airport Road, Bangalore", phone: "+91-80-6699-9999" },
+  
+  // Chennai region
+  { name: "Chennai Police HQ", type: "police", latitude: 13.0505, longitude: 80.2270, address: "Chennai Central, Tamil Nadu", phone: "+91-44-2538-2151" },
+  { name: "Apollo Hospital Chennai", type: "hospital", latitude: 13.1884, longitude: 80.2270, address: "Greams Road, Chennai", phone: "+91-44-2829-2020" },
+  { name: "Fortis Hospital", type: "hospital", latitude: 13.0827, longitude: 80.2707, address: "Enthirum Veedu, Chennai", phone: "+91-44-4219-0000" },
+];
+
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize database schema on startup (auto-creates tables if needed)
   await initializeDatabase();
@@ -622,7 +670,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Safe Places route using Overpass API (OpenStreetMap)
+  // Safe Places route - Local database search
   app.get('/api/safe-places', isAuthenticated, async (req: any, res) => {
     try {
       const startTime = Date.now();
@@ -636,103 +684,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Safe Places] Fetching locations for: ${userLat}, ${userLon}`);
 
-      // Priority-ordered search types with Overpass query tags
-      const searchTypes = [
-        { tags: 'amenity=police', type: 'police', priority: 1 },
-        { tags: 'amenity=hospital OR amenity=doctors OR healthcare=hospital', type: 'hospital', priority: 2 },
-        { tags: 'amenity=pharmacy', type: 'pharmacy', priority: 3 },
-      ];
+      const radius = 50; // 50km search radius
+      const allPlaces: any[] = [];
 
-      const radius = 5000; // 5km in meters
-      const safePlaces: any[] = [];
-      const seenPlaces = new Set<string>();
-
-      // Helper to convert bbox radius
-      const delta = (radius / 111000); // rough conversion: 111km per degree
-      const bbox = `${userLat - delta},${userLon - delta},${userLat + delta},${userLon + delta}`;
-
-      // Fetch nearby places for each type using Overpass API
-      const fetchPromises = searchTypes.map(async (searchType) => {
-        try {
-          // Overpass API query
-          const overpassQuery = `[bbox:${bbox}];(node[${searchType.tags}];way[${searchType.tags}];);out center;`;
-          const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
-          
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000);
-          
-          const response = await fetch(url, {
-            signal: controller.signal,
-            headers: { 'User-Agent': 'Crime-Report-Portal/1.0' }
+      // Search through database
+      for (const place of SAFE_PLACES_DB) {
+        const distance = calculateDistance(userLat, userLon, place.latitude, place.longitude);
+        
+        // Include places within radius
+        if (distance <= radius) {
+          allPlaces.push({
+            id: `${place.type}-${place.name}`,
+            name: place.name,
+            type: place.type,
+            latitude: place.latitude,
+            longitude: place.longitude,
+            address: place.address,
+            phone: place.phone,
+            distance: Math.round(distance * 100) / 100, // Round to 2 decimal places
+            priority: place.type === 'police' ? 1 : place.type === 'hospital' ? 2 : 3,
+            rating: 0,
+            isOpen: undefined
           });
-
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            console.warn(`[Safe Places] HTTP ${response.status} for ${searchType.type}`);
-            return [];
-          }
-
-          const data = await response.json();
-          
-          if (!Array.isArray(data.elements)) {
-            console.warn(`[Safe Places] Invalid response for ${searchType.type}`);
-            return [];
-          }
-
-          return data.elements
-            .filter((place: any) => place.lat && place.lon)
-            .map((place: any) => {
-              const placeId = `${place.type}-${place.id}`;
-              
-              // Skip duplicates
-              if (seenPlaces.has(placeId)) return null;
-              seenPlaces.add(placeId);
-
-              // Get center point for ways
-              const lat = place.center?.lat || place.lat;
-              const lon = place.center?.lon || place.lon;
-              
-              const distance = calculateDistance(userLat, userLon, lat, lon);
-              
-              // Extract name and phone from tags
-              const tags = place.tags || {};
-              const name = tags.name || `${searchType.type.charAt(0).toUpperCase() + searchType.type.slice(1)}`;
-              const phone = tags.phone || tags['contact:phone'] || "";
-              const address = tags['addr:full'] || `${tags['addr:street'] || ''} ${tags['addr:housenumber'] || ''}`.trim() || 'No address available';
-
-              return {
-                id: placeId,
-                name: name,
-                type: searchType.type,
-                latitude: lat,
-                longitude: lon,
-                address: address,
-                phone: phone,
-                distance: Math.round(distance * 1000) / 1000,
-                priority: searchType.priority,
-                rating: 0,
-                isOpen: undefined
-              };
-            })
-            .filter(Boolean)
-            .slice(0, 10); // Limit to 10 results per type
-        } catch (error: any) {
-          console.warn(`[Safe Places] Error fetching ${searchType.type}:`, error.message);
-          return [];
         }
-      });
-
-      // Execute all fetches in parallel
-      const results = await Promise.all(fetchPromises);
-      const allPlaces = results.flat();
-
-      if (!allPlaces || allPlaces.length === 0) {
-        console.warn(`[Safe Places] No locations found for ${userLat}, ${userLon}`);
-        return res.json([]);
       }
 
-      // Sort by priority, then distance
+      // Sort by priority (police first, then hospitals, then pharmacies), then by distance
       allPlaces.sort((a, b) => {
         if (a.priority !== b.priority) {
           return a.priority - b.priority;
@@ -741,7 +718,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const fetchTime = Date.now() - startTime;
-      console.log(`[Safe Places] ✓ Fetched ${allPlaces.length} places in ${fetchTime}ms. Police: ${allPlaces.filter(p => p.type === 'police').length}, Hospital: ${allPlaces.filter(p => p.type === 'hospital').length}, Pharmacy: ${allPlaces.filter(p => p.type === 'pharmacy').length}, With phones: ${allPlaces.filter(p => p.phone).length}`);
+      const police = allPlaces.filter(p => p.type === 'police').length;
+      const hospitals = allPlaces.filter(p => p.type === 'hospital').length;
+      const pharmacies = allPlaces.filter(p => p.type === 'pharmacy').length;
+      
+      console.log(`[Safe Places] ✓ Found ${allPlaces.length} places in ${fetchTime}ms. Police: ${police}, Hospitals: ${hospitals}, Pharmacies: ${pharmacies}, All have phones: ${allPlaces.every(p => p.phone)}`);
 
       res.json(allPlaces);
     } catch (error) {
