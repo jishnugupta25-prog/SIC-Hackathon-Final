@@ -15,7 +15,7 @@ import {
   type SosAlert,
   type InsertSosAlert,
 } from "@shared/schema";
-import { db } from "./db";
+import { getDb } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
 
 export interface IStorage {
@@ -43,16 +43,19 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   // User operations
   async getUser(id: string): Promise<User | undefined> {
+    const db = await getDb();
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
+    const db = await getDb();
     const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    const db = await getDb();
     // For email-based signup, generate a new ID if not provided
     if (!userData.id) {
       const [user] = await db

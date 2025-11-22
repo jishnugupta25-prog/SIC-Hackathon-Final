@@ -1,63 +1,74 @@
 // Auto-initialize database schema on startup
-import { db } from "./db";
+import { getDb } from "./db";
 
 export async function initializeDatabase() {
   try {
     console.log("Initializing database schema...");
+    const db = await getDb();
     
     // Create all tables if they don't exist
-    await db.execute(`
+    // Works with both PostgreSQL and SQLite
+    const isPostgres = process.env.DATABASE_URL ? true : false;
+    
+    // PostgreSQL uses gen_random_uuid(), SQLite uses random()
+    const idDefault = isPostgres ? 'gen_random_uuid()' : "lower(hex(randomblob(16)))";
+    const jsonbType = isPostgres ? 'jsonb' : 'json';
+    const textArray = isPostgres ? 'text[]' : 'text';
+    
+    const createTableSql = `
       CREATE TABLE IF NOT EXISTS "users" (
-        "id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
-        "email" varchar UNIQUE,
-        "first_name" varchar,
-        "last_name" varchar,
-        "profile_image_url" varchar,
-        "password_hash" varchar,
-        "created_at" timestamp DEFAULT now(),
-        "updated_at" timestamp DEFAULT now()
+        "id" text PRIMARY KEY DEFAULT ${idDefault},
+        "email" text UNIQUE,
+        "first_name" text,
+        "last_name" text,
+        "profile_image_url" text,
+        "password_hash" text,
+        "created_at" datetime DEFAULT current_timestamp,
+        "updated_at" datetime DEFAULT current_timestamp
       );
 
       CREATE TABLE IF NOT EXISTS "sessions" (
-        "sid" varchar PRIMARY KEY,
-        "sess" jsonb NOT NULL,
-        "expire" timestamp NOT NULL
+        "sid" text PRIMARY KEY,
+        "sess" ${jsonbType} NOT NULL,
+        "expire" datetime NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS "emergency_contacts" (
-        "id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
-        "user_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
-        "name" varchar,
-        "phone_number" varchar,
-        "relationship" varchar,
-        "created_at" timestamp DEFAULT now()
+        "id" text PRIMARY KEY DEFAULT ${idDefault},
+        "user_id" text NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "name" text,
+        "phone_number" text,
+        "relationship" text,
+        "created_at" datetime DEFAULT current_timestamp
       );
 
       CREATE TABLE IF NOT EXISTS "crime_reports" (
-        "id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
-        "user_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
-        "crime_type" varchar,
+        "id" text PRIMARY KEY DEFAULT ${idDefault},
+        "user_id" text NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "crime_type" text,
         "description" text,
         "latitude" real,
         "longitude" real,
         "address" text,
-        "is_anonymous" boolean DEFAULT false,
-        "reported_at" timestamp DEFAULT now(),
-        "created_at" timestamp DEFAULT now()
+        "is_anonymous" integer DEFAULT 0,
+        "reported_at" datetime DEFAULT current_timestamp,
+        "created_at" datetime DEFAULT current_timestamp
       );
 
       CREATE TABLE IF NOT EXISTS "sos_alerts" (
-        "id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
-        "user_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "id" text PRIMARY KEY DEFAULT ${idDefault},
+        "user_id" text NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
         "latitude" real,
         "longitude" real,
         "address" text,
-        "sent_to" text[],
-        "created_at" timestamp DEFAULT now()
+        "sent_to" ${textArray},
+        "created_at" datetime DEFAULT current_timestamp
       );
 
       CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "sessions"("expire");
-    `);
+    `;
+    
+    await db.execute(createTableSql);
     
     console.log("✅ Database schema initialized successfully");
   } catch (error: any) {
