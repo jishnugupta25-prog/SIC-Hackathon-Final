@@ -131,9 +131,9 @@ export default function Signup() {
 
         <div className="text-center text-sm">
           Already have an account?{' '}
-          <Button variant="link" onClick={() => navigate('/login')} data-testid="link-login">
+          <button onClick={() => navigate('/login')} className="text-primary hover:underline font-semibold" data-testid="link-login">
             Sign In
-          </Button>
+          </button>
         </div>
       </Card>
     </div>

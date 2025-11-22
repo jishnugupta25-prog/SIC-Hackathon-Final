@@ -151,9 +151,11 @@ export class DatabaseStorage implements IStorage {
   // SOS Alerts operations
   async createSosAlert(alert: InsertSosAlert): Promise<SosAlert> {
     const db = await getDb();
+    // Convert sentTo array to JSON string for database storage
+    const sentToString = Array.isArray(alert.sentTo) ? JSON.stringify(alert.sentTo) : alert.sentTo;
     const [newAlert] = await db
       .insert(sosAlerts)
-      .values({ ...alert, id: randomUUID(), createdAt: new Date() })
+      .values({ ...alert, sentTo: sentToString, id: randomUUID(), createdAt: new Date() })
       .returning();
     return newAlert;
   }

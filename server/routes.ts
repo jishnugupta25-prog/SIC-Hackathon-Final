@@ -273,7 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         latitude,
         longitude,
         address: address || null,
-        sentTo,
+        sentTo: sentTo, // Array of phone numbers
       });
       const alert = await storage.createSosAlert(alertData);
 

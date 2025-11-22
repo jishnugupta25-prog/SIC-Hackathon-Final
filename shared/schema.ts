@@ -99,13 +99,14 @@ export type InsertCrimeReport = z.infer<typeof insertCrimeReportSchema>;
 export type CrimeReport = typeof crimeReports.$inferSelect;
 
 // SOS Alerts table - Track SOS button activations
+// Using text field instead of array for SQLite compatibility
 export const sosAlerts = pgTable("sos_alerts", {
   id: varchar("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   latitude: real("latitude").notNull(),
   longitude: real("longitude").notNull(),
   address: text("address"),
-  sentTo: text("sent_to").array(),
+  sentTo: text("sent_to"), // Store as JSON string for cross-database compatibility
   createdAt: timestamp("created_at"),
 });
 
@@ -119,6 +120,8 @@ export const sosAlertsRelations = relations(sosAlerts, ({ one }) => ({
 export const insertSosAlertSchema = createInsertSchema(sosAlerts).omit({
   id: true,
   createdAt: true,
+}).extend({
+  sentTo: z.union([z.array(z.string()), z.string()]).optional(),
 });
 
 export type InsertSosAlert = z.infer<typeof insertSosAlertSchema>;
