@@ -212,7 +212,52 @@ export default function Home() {
     setSosActive(false);
     setSosCounter(0);
     setShowSosConfirm(false);
-    setNavigateLocation("/sos-messaging");
+
+    // Open native SMS app with pre-filled recipients and message
+    if (!location) {
+      toast({
+        title: "Location Error",
+        description: "Unable to get location for SOS message",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Build phone numbers list - format with +91 if needed
+    const phoneNumbers = contacts
+      .map((contact) => {
+        const phone = contact.phoneNumber.replace(/[^\d+]/g, ""); // Remove formatting
+        // Add +91 if not present
+        return phone.startsWith("+") ? phone : `+91${phone.replace(/^0+/, "")}`;
+      })
+      .join(",");
+
+    // Build message with location and user info
+    const message = `I am in danger save me!!
+
+📍 Location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}
+👤 From: ${user?.firstName || user?.email}`;
+
+    // Create SMS URI
+    const smsUri = `sms:${phoneNumbers}?body=${encodeURIComponent(message)}`;
+
+    console.log("[SOS] Opening native SMS app with URI:", smsUri);
+
+    // Open the native SMS app
+    window.location.href = smsUri;
+
+    // Log the SOS alert to history (fire and forget, don't wait)
+    apiRequest("POST", "/api/sos", {
+      latitude: location.latitude,
+      longitude: location.longitude,
+    }).catch((error) => {
+      console.error("[SOS] Failed to log SOS alert:", error);
+    });
+
+    toast({
+      title: "SOS Activated",
+      description: `Opening SMS app to send alert to ${contacts.length} contact${contacts.length !== 1 ? "s" : ""}`,
+    });
   };
 
   if (authLoading) {
