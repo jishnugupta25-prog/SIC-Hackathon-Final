@@ -111,6 +111,14 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
+// Middleware to check if user is an admin
+function isAdmin(req: any, res: any, next: any) {
+  if (!req.user || !req.user.claims || !req.user.claims.isAdmin) {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+  next();
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize database schema on startup (auto-creates tables if needed)
   await initializeDatabase();
@@ -1080,7 +1088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get crimes for admin review
-  app.get('/api/admin/crimes', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/crimes', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const crimes = await storage.getCrimesForReview();
       res.json(crimes);
@@ -1091,7 +1099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Approve a crime report
-  app.post('/api/admin/approve/:crimeId', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/approve/:crimeId', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const adminId = req.user.claims.sub;
       const crimeId = req.params.crimeId;
@@ -1105,7 +1113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reject a crime report
-  app.post('/api/admin/reject/:crimeId', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/reject/:crimeId', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const adminId = req.user.claims.sub;
       const crimeId = req.params.crimeId;
@@ -1119,7 +1127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Send feedback to user about a crime report
-  app.post('/api/admin/feedback', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/feedback', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const adminId = req.user.claims.sub;
       const { crimeId, message } = req.body;
