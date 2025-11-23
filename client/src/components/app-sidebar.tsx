@@ -38,6 +38,11 @@ const menuItems = [
     icon: Shield,
   },
   {
+    title: "My Reports",
+    url: "/my-reports",
+    icon: AlertTriangle,
+  },
+  {
     title: "Emergency Contacts",
     url: "/contacts",
     icon: Users,

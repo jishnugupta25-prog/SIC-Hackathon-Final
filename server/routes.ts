@@ -1224,6 +1224,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user's crime reports with approval status and feedback
+  app.get('/api/user/crimes', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const userCrimes = await storage.getUserCrimeReports(userId);
+      
+      // Add approval status and feedback for each crime
+      const crimesWithStatus = await Promise.all(
+        userCrimes.map(async (crime) => {
+          const feedback = await storage.getCrimeFeedback(crime.id);
+          
+          return {
+            ...crime,
+            approval: {
+              status: 'pending',
+              feedback: feedback
+            }
+          };
+        })
+      );
+      
+      res.json(crimesWithStatus);
+    } catch (error) {
+      console.error("Error fetching user crimes:", error);
+      res.status(500).json({ message: "Failed to fetch your crime reports" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
