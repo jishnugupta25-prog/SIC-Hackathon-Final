@@ -709,13 +709,6 @@ export default function SafeRoutes() {
 
           {selectedRoute && (
             <div className="space-y-4 overflow-y-auto flex-1 pr-4">
-              {/* Route Map */}
-              <div
-                id="route-modal-map"
-                className="bg-muted rounded-md w-full"
-                style={{ height: "220px", minHeight: "220px" }}
-              />
-
               {/* Route Details */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-muted p-3 rounded-lg">
