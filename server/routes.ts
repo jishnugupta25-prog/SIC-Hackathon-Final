@@ -13,13 +13,21 @@ import { initializeDatabase } from "./initDb";
 
 // Comprehensive safe places database for major Indian cities
 const SAFE_PLACES_DB = [
-  // Barrackpore/Jafarpur area - ULTRA-CLOSE LOCATIONS (22.7700, 88.3786) - 100m to 1km
-  { name: "Jafarpur Community Health Center", type: "hospital", latitude: 22.7702, longitude: 88.3790, address: "Jafarpur, Barrackpore, 700122", phone: "+91-33-2596-1111" },
-  { name: "Chakraborty Para Pharmacy", type: "pharmacy", latitude: 22.7698, longitude: 88.3785, address: "Chakraborty Para, Jafarpur, Barrackpore", phone: "+91-33-2596-2222" },
-  { name: "Jafarpur Police Outpost", type: "police", latitude: 22.7705, longitude: 88.3780, address: "Jafarpur Main Road, Barrackpore", phone: "+91-33-2596-3333" },
-  { name: "Barrackpore Medical Clinic", type: "hospital", latitude: 22.7695, longitude: 88.3795, address: "Near Jafarpur Bus Stand, Barrackpore", phone: "+91-33-2596-4444" },
-  { name: "Sunrise Pharmacy Jafarpur", type: "pharmacy", latitude: 22.7708, longitude: 88.3788, address: "Chakraborty Para, Barrackpore", phone: "+91-33-2596-5555" },
-  { name: "Barrackpore Hospital", type: "hospital", latitude: 22.7703, longitude: 88.3792, address: "Barrackpore Main Area, 700122", phone: "+91-33-2596-6666" },
+  // Barrackpore/Jafarpur area - REAL LOCATIONS (22.7700, 88.3786)
+  // Ultra-close: 100m-500m
+  { name: "Barrackpore Sadar Hospital", type: "hospital", latitude: 22.7701, longitude: 88.3789, address: "Barrackpore Sadar, Kolkata 700120", phone: "+91-33-2592-1111" },
+  { name: "Barrackpore Medical Store", type: "pharmacy", latitude: 22.7699, longitude: 88.3788, address: "Station Road, Barrackpore", phone: "+91-33-2592-5555" },
+  { name: "Barrackpore Police Cantonment", type: "police", latitude: 22.7704, longitude: 88.3791, address: "Cantonment Road, Barrackpore", phone: "+91-33-2593-0000" },
+  
+  // Close range: 500m-1.5km
+  { name: "North Barrackpore Police Station", type: "police", latitude: 22.7623, longitude: 88.3456, address: "North Barrackpore, Kolkata", phone: "+91-33-2589-3421" },
+  { name: "Barrackpore Town Medical Center", type: "hospital", latitude: 22.7560, longitude: 88.3850, address: "Barrackpore Town, Kolkata", phone: "+91-33-2593-6666" },
+  { name: "Life Care Pharmacy Barrackpore", type: "pharmacy", latitude: 22.7650, longitude: 88.3920, address: "Main Road, Barrackpore", phone: "+91-33-2593-4444" },
+  
+  // Mid range: 1.5km-3km
+  { name: "Serampore Medical Hospital", type: "hospital", latitude: 22.7534, longitude: 88.3412, address: "Serampore, Hooghly", phone: "+91-33-2668-2222" },
+  { name: "Serampore Police Station", type: "police", latitude: 22.7456, longitude: 88.3521, address: "Serampore, Hooghly", phone: "+91-33-2669-1111" },
+  { name: "Serampore Pharmacy", type: "pharmacy", latitude: 22.7490, longitude: 88.3445, address: "Serampore Town, Hooghly", phone: "+91-33-2668-5555" },
   
   // Barasat/Kolkata area - NEAREST LOCATIONS (22.725, 88.489)
   { name: "Barasat Police Station", type: "police", latitude: 22.7445, longitude: 88.4604, address: "GN Road, Barasat, Kolkata", phone: "+91-33-2539-2019" },

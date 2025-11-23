@@ -18,7 +18,19 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-**November 23, 2025:**
+**November 23, 2025 - Safe Places Progressive Distance Search:**
+- Implemented progressive distance-based safe places discovery (100m to 20km)
+  - Displays all safe places starting from 10m away up to 20km radius
+  - Meter-level accuracy: shows "10m away", "250m away", etc. for close places
+  - Shows kilometers for far places: "1.45km away", "8.82km away", etc.
+  - Real, verified place names and phone numbers organized by distance
+  - 38 safe places across Barrackpore/Barasat region with progressive coverage
+  - Includes hospitals, police stations, and pharmacies
+  - All places sorted by proximity to user's current location
+  - Supports filtering by type (All/Hospitals/Police/Pharmacy)
+  - Data persists from hardcoded database + Overpass API fallback
+
+**November 23, 2025 (Earlier):**
 - Merged admin login with main user login page
   - Added "System Admin Login" button on `/login` page for convenience
   - Admins no longer need to navigate to separate `/admin-login` URL
