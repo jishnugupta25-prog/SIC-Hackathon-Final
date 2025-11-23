@@ -134,13 +134,14 @@ export default function SafeRoutes() {
     };
   }, []);
 
-  // Search locations using Nominatim (OpenStreetMap)
+  // Search locations using Nominatim (OpenStreetMap) - Priority to Indian locations
   const searchLocations = async (query: string): Promise<LocationSuggestion[]> => {
     if (!query || query.length < 2) return [];
 
     try {
+      // Search with India country code first for priority
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=15&addressdetails=1`
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycode=in&format=json&limit=20&addressdetails=1`
       );
       const data = await response.json();
       
