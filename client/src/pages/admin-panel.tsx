@@ -34,6 +34,8 @@ type CrimeForReview = {
   isAnonymous: number;
   reportedAt?: string;
   createdAt?: string;
+  evidenceUrls?: string;
+  voiceMessageUrl?: string;
   approval?: {
     status: string;
     reviewedAt?: string;
@@ -758,6 +760,66 @@ export default function AdminPanel() {
                         : "Not available"}
                     </p>
                   </div>
+
+                  {/* Evidence Section */}
+                  {(selectedCrime.evidenceUrls || selectedCrime.voiceMessageUrl) && (
+                    <div className="border-t pt-2">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">Evidence & Media</p>
+                      
+                      {/* Evidence Images/Videos */}
+                      {selectedCrime.evidenceUrls && (
+                        <div className="space-y-2 mb-2">
+                          {(() => {
+                            try {
+                              const urls = JSON.parse(selectedCrime.evidenceUrls);
+                              return Array.isArray(urls) ? urls.map((url: string, idx: number) => (
+                                <div key={idx} className="bg-muted/50 p-2 rounded">
+                                  {url.startsWith("data:image") ? (
+                                    <>
+                                      <p className="text-xs text-muted-foreground mb-1">Image {idx + 1}</p>
+                                      <img 
+                                        src={url} 
+                                        alt={`Evidence ${idx + 1}`} 
+                                        className="max-w-full h-auto rounded border border-border"
+                                        style={{ maxHeight: "120px" }}
+                                      />
+                                    </>
+                                  ) : url.startsWith("data:video") ? (
+                                    <>
+                                      <p className="text-xs text-muted-foreground mb-1">Video {idx + 1}</p>
+                                      <video
+                                        controls
+                                        className="max-w-full h-auto rounded border border-border"
+                                        style={{ maxHeight: "120px" }}
+                                      >
+                                        <source src={url} />
+                                      </video>
+                                    </>
+                                  ) : null}
+                                </div>
+                              )) : null;
+                            } catch (e) {
+                              return null;
+                            }
+                          })()}
+                        </div>
+                      )}
+
+                      {/* Voice Message */}
+                      {selectedCrime.voiceMessageUrl && (
+                        <div className="bg-muted/50 p-2 rounded mb-2">
+                          <p className="text-xs text-muted-foreground mb-1">Voice Message</p>
+                          <audio
+                            controls
+                            className="w-full"
+                            style={{ height: "30px" }}
+                          >
+                            <source src={selectedCrime.voiceMessageUrl} type="audio/mp3" />
+                          </audio>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Feedback Section - Compact */}
                   <div className="border-t pt-2 mt-2">

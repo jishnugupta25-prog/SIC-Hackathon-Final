@@ -27,7 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertTriangle, MapPin, CheckCircle } from "lucide-react";
+import { AlertTriangle, MapPin, CheckCircle, Upload, Mic, Square, Play, Trash2, Image as ImageIcon, Video, Volume2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertCrimeReportSchema } from "@shared/schema";
@@ -78,6 +78,11 @@ export default function ReportCrime() {
   const [selectedLocation, setSelectedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedAddress, setSelectedAddress] = useState<string>("");
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [voiceMessage, setVoiceMessage] = useState<Blob | null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [voicePlayUrl, setVoicePlayUrl] = useState<string>("");
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -239,6 +244,54 @@ export default function ReportCrime() {
     },
   });
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setEvidenceFiles([...evidenceFiles, ...files]);
+  };
+
+  const removeEvidenceFile = (index: number) => {
+    setEvidenceFiles(evidenceFiles.filter((_, i) => i !== index));
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: BlobPart[] = [];
+
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: "audio/mp3" });
+        setVoiceMessage(blob);
+        setVoicePlayUrl(URL.createObjectURL(blob));
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+    } catch (error) {
+      toast({
+        title: "Microphone Error",
+        description: "Unable to access microphone",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const clearVoiceMessage = () => {
+    setVoiceMessage(null);
+    setVoicePlayUrl("");
+    if (voicePlayUrl) URL.revokeObjectURL(voicePlayUrl);
+  };
+
   const onSubmit = (data: ReportFormData) => {
     if (!location) {
       toast({
@@ -249,11 +302,45 @@ export default function ReportCrime() {
       return;
     }
 
-    reportMutation.mutate({
-      ...data,
-      latitude: location.latitude,
-      longitude: location.longitude,
+    // Convert files to base64 and create data URLs
+    const filePromises = evidenceFiles.map(
+      (file) =>
+        new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        })
+    );
+
+    Promise.all(filePromises).then((evidenceUrls) => {
+      // Convert voice message to base64
+      let voiceUrl = "";
+      if (voiceMessage) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          voiceUrl = reader.result as string;
+          submitReport({
+            ...data,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            evidenceUrls: evidenceUrls.length > 0 ? JSON.stringify(evidenceUrls) : undefined,
+            voiceMessageUrl: voiceUrl || undefined,
+          });
+        };
+        reader.readAsDataURL(voiceMessage);
+      } else {
+        submitReport({
+          ...data,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          evidenceUrls: evidenceUrls.length > 0 ? JSON.stringify(evidenceUrls) : undefined,
+        });
+      }
     });
+  };
+
+  const submitReport = (data: ReportFormData) => {
+    reportMutation.mutate(data);
   };
 
   // Reverse geocode coordinates to get address
@@ -496,6 +583,128 @@ export default function ReportCrime() {
                       </div>
                     </div>
                   )}
+
+                  {/* Evidence Upload Section */}
+                  <div className="space-y-3 border-t pt-4">
+                    <div>
+                      <FormLabel className="flex items-center gap-2 mb-2">
+                        <Upload className="h-4 w-4" />
+                        Evidence Files (Images/Videos)
+                      </FormLabel>
+                      <FormDescription className="mb-2">
+                        Upload photos, videos, or other evidence related to the crime (optional)
+                      </FormDescription>
+                      <div className="flex gap-2">
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*,video/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="evidence-upload"
+                          data-testid="input-evidence-files"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => document.getElementById("evidence-upload")?.click()}
+                          data-testid="button-upload-evidence"
+                        >
+                          <ImageIcon className="h-4 w-4 mr-2" />
+                          Add Files
+                        </Button>
+                      </div>
+
+                      {/* Display selected evidence files */}
+                      {evidenceFiles.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-sm font-medium text-foreground">
+                            Selected Files ({evidenceFiles.length}):
+                          </p>
+                          {evidenceFiles.map((file, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between bg-muted p-2 rounded-md text-sm"
+                              data-testid={`item-evidence-${idx}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                {file.type.startsWith("video") ? (
+                                  <Video className="h-4 w-4 text-primary" />
+                                ) : (
+                                  <ImageIcon className="h-4 w-4 text-primary" />
+                                )}
+                                <span className="truncate">{file.name}</span>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeEvidenceFile(idx)}
+                                data-testid={`button-remove-evidence-${idx}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Voice Message Recording Section */}
+                  <div className="space-y-3 border-t pt-4">
+                    <div>
+                      <FormLabel className="flex items-center gap-2 mb-2">
+                        <Mic className="h-4 w-4" />
+                        Voice Message Explanation
+                      </FormLabel>
+                      <FormDescription className="mb-2">
+                        Record a voice message to explain what happened (optional)
+                      </FormDescription>
+
+                      {!voiceMessage ? (
+                        <Button
+                          type="button"
+                          variant={isRecording ? "destructive" : "outline"}
+                          size="sm"
+                          onClick={isRecording ? stopRecording : startRecording}
+                          data-testid={isRecording ? "button-stop-recording" : "button-start-recording"}
+                        >
+                          {isRecording ? (
+                            <>
+                              <Square className="h-4 w-4 mr-2" />
+                              Stop Recording
+                            </>
+                          ) : (
+                            <>
+                              <Mic className="h-4 w-4 mr-2" />
+                              Start Recording
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 bg-muted p-3 rounded-md">
+                            <Volume2 className="h-4 w-4 text-primary flex-shrink-0" />
+                            <audio controls className="flex-1 h-8" data-testid="audio-player">
+                              <source src={voicePlayUrl} type="audio/mp3" />
+                            </audio>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={clearVoiceMessage}
+                              data-testid="button-clear-voice"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Voice message recorded ✓</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   <FormField
                     control={form.control}

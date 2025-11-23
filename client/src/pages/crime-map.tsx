@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Map, AlertTriangle, Calendar, MapPin, Brain } from "lucide-react";
+import { Map, AlertTriangle, Calendar, MapPin, Brain, Layers } from "lucide-react";
 import type { CrimeReport } from "@shared/schema";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -24,6 +24,7 @@ export default function CrimeMap() {
     longitude: number;
   } | null>(null);
   const [selectedCrime, setSelectedCrime] = useState<CrimeReport | null>(null);
+  const [showHeatmap, setShowHeatmap] = useState(true);
 
   const {
     data: crimes = [],
@@ -217,41 +218,49 @@ export default function CrimeMap() {
       .bindPopup("Your Location")
       .addTo(leafletMap);
 
-    // Add circles for sensitive areas (high crime density zones)
-    const crimeHotspots: Record<string, { lat: number; lon: number; count: number }> = {};
-    
-    crimes.forEach((crime) => {
-      const key = `${Math.round(crime.latitude * 100)},${Math.round(crime.longitude * 100)}`;
-      if (crimeHotspots[key]) {
-        crimeHotspots[key].count++;
-      } else {
-        crimeHotspots[key] = {
-          lat: crime.latitude,
-          lon: crime.longitude,
-          count: 1,
-        };
-      }
-    });
+    // Add heatmap layer showing crime density
+    if (showHeatmap) {
+      const crimeHotspots: Record<string, { lat: number; lon: number; count: number }> = {};
+      
+      crimes.forEach((crime) => {
+        const key = `${Math.round(crime.latitude * 100)},${Math.round(crime.longitude * 100)}`;
+        if (crimeHotspots[key]) {
+          crimeHotspots[key].count++;
+        } else {
+          crimeHotspots[key] = {
+            lat: crime.latitude,
+            lon: crime.longitude,
+            count: 1,
+          };
+        }
+      });
 
-    // Draw sensitive areas as circles based on crime concentration
-    Object.values(crimeHotspots).forEach((hotspot: { lat: number; lon: number; count: number }) => {
-      const intensity = Math.min(hotspot.count / 5, 1); // Max intensity at 5+ crimes
-      const radius = 300 + intensity * 1200; // 300m to 1500m radius
-      const opacity = 0.2 + intensity * 0.3; // 0.2 to 0.5 opacity
+      // Draw heatmap: circles with gradient colors based on crime concentration
+      Object.values(crimeHotspots).forEach((hotspot: { lat: number; lon: number; count: number }) => {
+        const intensity = Math.min(hotspot.count / 5, 1); // Max intensity at 5+ crimes
+        const radius = 300 + intensity * 1200; // 300m to 1500m radius
+        
+        // Color gradient: Yellow (low) -> Orange (medium) -> Red (high)
+        let fillColor = "#fbbf24"; // Yellow for low crime (1-2 incidents)
+        if (intensity > 0.33) fillColor = "#f97316"; // Orange for medium (3-4 incidents)
+        if (intensity > 0.66) fillColor = "#ef4444"; // Red for high (5+ incidents)
+        
+        const opacity = 0.2 + intensity * 0.3; // 0.2 to 0.5 opacity
 
-      L.circle([hotspot.lat, hotspot.lon], {
-        radius: radius,
-        color: "#ef4444",
-        weight: 2,
-        opacity: opacity,
-        fillColor: "#ef4444",
-        fillOpacity: opacity * 0.5,
-      })
-        .bindPopup(
-          `<strong>Sensitive Area</strong><br/>Crime incidents: ${hotspot.count}`
-        )
-        .addTo(leafletMap);
-    });
+        L.circle([hotspot.lat, hotspot.lon], {
+          radius: radius,
+          color: fillColor,
+          weight: 2,
+          opacity: opacity,
+          fillColor: fillColor,
+          fillOpacity: opacity * 0.4,
+        })
+          .bindPopup(
+            `<strong>Crime Density</strong><br/>Incidents: ${hotspot.count}<br/><em>Red=Highest danger zone</em>`
+          )
+          .addTo(leafletMap);
+      });
+    }
 
     // Add crime report markers
     crimes.forEach((crime, idx) => {
@@ -311,7 +320,7 @@ export default function CrimeMap() {
     return () => {
       leafletMap.remove();
     };
-  }, [location, crimes]);
+  }, [location, crimes, showHeatmap]);
 
   const getCrimeTypeColor = (type: string) => {
     const colors: Record<string, string> = {
@@ -407,7 +416,7 @@ export default function CrimeMap() {
                 className="bg-muted rounded-md mb-4"
                 style={{ height: "400px" }}
               />
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-primary" />
                   <span className="text-sm">
@@ -416,7 +425,18 @@ export default function CrimeMap() {
                       : "Location unavailable"}
                   </span>
                 </div>
-                <Badge variant="outline">{crimes.length} Reports</Badge>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={showHeatmap ? "default" : "outline"}
+                    onClick={() => setShowHeatmap(!showHeatmap)}
+                    data-testid="button-toggle-heatmap"
+                  >
+                    <Layers className="h-4 w-4 mr-2" />
+                    {showHeatmap ? "Hide Heatmap" : "Show Heatmap"}
+                  </Button>
+                  <Badge variant="outline">{crimes.length} Reports</Badge>
+                </div>
               </div>
             </CardContent>
           </Card>

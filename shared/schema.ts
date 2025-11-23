@@ -81,6 +81,8 @@ export const crimeReports = pgTable("crime_reports", {
   isAnonymous: integer("is_anonymous").default(0), // 0=false, 1=true for SQLite compatibility
   reportedAt: timestamp("reported_at"),
   createdAt: timestamp("created_at"),
+  evidenceUrls: text("evidence_urls"), // Store as JSON string for cross-database compatibility
+  voiceMessageUrl: text("voice_message_url"), // URL to voice message file
 });
 
 export const crimeReportsRelations = relations(crimeReports, ({ one }) => ({
@@ -97,6 +99,8 @@ export const insertCrimeReportSchema = createInsertSchema(crimeReports).omit({
   reportedAt: true,
 }).extend({
   phoneNumber: z.string().min(7, "Phone number must be at least 7 digits").max(20, "Phone number is too long"),
+  evidenceUrls: z.union([z.array(z.string()), z.string()]).optional(),
+  voiceMessageUrl: z.string().optional(),
 });
 
 export type InsertCrimeReport = z.infer<typeof insertCrimeReportSchema>;
