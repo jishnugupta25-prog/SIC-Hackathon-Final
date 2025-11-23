@@ -1228,17 +1228,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/user/crimes', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const userCrimes = await storage.getUserCrimeReports(userId);
       
-      // Add approval status and feedback for each crime
+      // Get all crimes to find user's crimes
+      const allCrimes = await storage.getCrimesForReview();
+      const userCrimes = allCrimes.filter(c => c.userId === userId);
+      
+      // Add feedback for each crime
       const crimesWithStatus = await Promise.all(
         userCrimes.map(async (crime) => {
           const feedback = await storage.getCrimeFeedback(crime.id);
           
           return {
             ...crime,
-            approval: {
+            approval: crime.approval ? {
+              status: crime.approval.status,
+              reviewedAt: crime.approval.reviewedAt,
+              feedback: feedback
+            } : {
               status: 'pending',
+              reviewedAt: null,
               feedback: feedback
             }
           };

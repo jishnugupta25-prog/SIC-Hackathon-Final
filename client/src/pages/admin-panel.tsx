@@ -87,8 +87,7 @@ export default function AdminPanel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/crimes"] });
-      setIsModalOpen(false);
-      setSelectedCrimeId(null);
+      // Don't close modal - user must submit feedback first
     },
   });
 
@@ -99,8 +98,7 @@ export default function AdminPanel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/crimes"] });
-      setIsModalOpen(false);
-      setSelectedCrimeId(null);
+      // Don't close modal - user must submit feedback first
     },
   });
 
@@ -117,6 +115,9 @@ export default function AdminPanel() {
       setFeedbackMessage("");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/crimes"] });
       queryClient.invalidateQueries({ queryKey: [`/api/admin/crimes/${selectedCrimeId}/feedback`] });
+      // Close modal only after feedback is submitted
+      setIsModalOpen(false);
+      setSelectedCrimeId(null);
     },
   });
 
