@@ -209,23 +209,25 @@ export default function AdminPanel() {
   const approvedCrimes = crimes.filter((c) => c.approval?.status === "approved");
   const rejectedCrimes = crimes.filter((c) => c.approval?.status === "rejected");
 
-  // Sort crimes based on selected option (pending > approved > rejected)
-  const sortedCrimes = [...crimes].sort((a, b) => {
-    if (sortBy === "all") {
-      // Default sort: pending first, then approved, then rejected
-      const statusOrder = { pending: 0, approved: 1, rejected: 2 };
-      const aStatus = a.approval?.status || "pending";
-      const bStatus = b.approval?.status || "pending";
-      return statusOrder[aStatus as keyof typeof statusOrder] - statusOrder[bStatus as keyof typeof statusOrder];
-    } else if (sortBy === "pending") {
-      return (a.approval?.status || "pending") === "pending" ? -1 : 1;
-    } else if (sortBy === "approved") {
-      return a.approval?.status === "approved" ? -1 : 1;
-    } else if (sortBy === "rejected") {
-      return a.approval?.status === "rejected" ? -1 : 1;
-    }
-    return 0;
-  });
+  // Filter and sort crimes based on selected option
+  const sortedCrimes = [...crimes]
+    .filter((crime) => {
+      if (sortBy === "all") return true; // Show all
+      if (sortBy === "pending") return !crime.approval || crime.approval.status === "pending";
+      if (sortBy === "approved") return crime.approval?.status === "approved";
+      if (sortBy === "rejected") return crime.approval?.status === "rejected";
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "all") {
+        // Default sort: pending first, then approved, then rejected
+        const statusOrder = { pending: 0, approved: 1, rejected: 2 };
+        const aStatus = a.approval?.status || "pending";
+        const bStatus = b.approval?.status || "pending";
+        return statusOrder[aStatus as keyof typeof statusOrder] - statusOrder[bStatus as keyof typeof statusOrder];
+      }
+      return 0;
+    });
 
   // Calculate user tracking statistics
   const totalUsers = usersTracking.length;
