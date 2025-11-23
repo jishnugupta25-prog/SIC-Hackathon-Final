@@ -66,8 +66,8 @@ export default function CrimeMap() {
 
     const options = {
       enableHighAccuracy: true, // Enable high accuracy for ±2-3 meters precision
-      timeout: 60000, // 60 seconds for satellite lock and maximum accuracy
-      maximumAge: 0, // Always get fresh readings
+      timeout: 120000, // 120 seconds for satellite lock
+      maximumAge: 30000, // Allow cached results up to 30 seconds old for faster responses
     };
 
     console.log("Requesting crime map location...");

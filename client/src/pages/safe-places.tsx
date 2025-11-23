@@ -160,8 +160,8 @@ export default function SafePlaces() {
   const requestLocationFn = () => {
     const options = {
       enableHighAccuracy: true,
-      timeout: 60000, // 60 seconds for satellite lock and accuracy
-      maximumAge: 0, // Always get fresh readings for max accuracy
+      timeout: 120000, // 120 seconds for satellite lock
+      maximumAge: 30000, // Allow cached results up to 30 seconds old for faster responses
     };
 
     setLocationStatus("loading");
