@@ -1064,7 +1064,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Safe Places route - Works for ANY location worldwide (NOT limited to Barasat)
+  // Safe Places route - Fetches REAL verified places from Google Places API for ANY location worldwide
   app.get('/api/safe-places', isAuthenticated, async (req: any, res) => {
     try {
       const startTime = Date.now();
@@ -1076,145 +1076,156 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid coordinates" });
       }
       
-      console.log(`[Safe Places] Fetching REAL-TIME nearby safe places for ANY location: ${userLat}, ${userLon}`);
+      const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!googleMapsApiKey) {
+        console.warn("[Safe Places] Google Maps API key not available, using fallback database");
+        return sendFallbackPlaces(userLat, userLon, res);
+      }
+      
+      console.log(`[Safe Places] Fetching real verified places from Google Maps API for location: ${userLat}, ${userLon}`);
 
-      const radius = 20; // 20km search radius (100m to 20km) - show all nearby safe places with meter accuracy
-      const radiusMeters = radius * 1000;
+      const radius = 20000; // 20km in meters
       const allPlaces: any[] = [];
       const seenPlaces = new Set<string>();
 
-      // Try Overpass API first for REAL-TIME worldwide data (works for ANY user location)
-      try {
-        console.log(`[Safe Places] Fetching REAL-TIME data from Overpass API for any location worldwide...`);
-        
-        // Build Overpass QL query - search for amenities in bounding box
-        const delta = radius / 111.0; // Convert km to degrees
-        const bbox = `${userLat - delta},${userLon - delta},${userLat + delta},${userLon + delta}`;
-        
-        console.log(`[Safe Places] Search bbox: ${bbox}, user location: ${userLat}, ${userLon}`);
-        
-        const queries = [
-          `[timeout:30][bbox:${bbox}];(node["amenity"="police"];way["amenity"="police"];);out center json;`,
-          `[timeout:30][bbox:${bbox}];(node["amenity"="hospital"];node["amenity"="clinic"];node["amenity"="doctors"];way["amenity"="hospital"];way["amenity"="clinic"];);out center json;`,
-          `[timeout:30][bbox:${bbox}];(node["amenity"="pharmacy"];way["amenity"="pharmacy"];);out center json;`
-        ];
+      // Search types for Google Places API
+      const searchTypes = [
+        { type: 'hospital', label: 'hospital' },
+        { type: 'police', label: 'police' },
+        { type: 'pharmacy', label: 'pharmacy' }
+      ];
 
-        const typeMap = {
-          0: 'police',
-          1: 'hospital',
-          2: 'pharmacy'
-        };
+      // Fetch from Google Places API for each type
+      for (const searchType of searchTypes) {
+        try {
+          console.log(`[Safe Places] Searching for ${searchType.label} near ${userLat}, ${userLon}...`);
+          
+          const url = new URL('https://maps.googleapis.com/maps/api/place/nearbysearch/json');
+          url.searchParams.append('location', `${userLat},${userLon}`);
+          url.searchParams.append('radius', radius.toString());
+          url.searchParams.append('type', searchType.type);
+          url.searchParams.append('key', googleMapsApiKey);
 
-        for (let i = 0; i < queries.length; i++) {
-          try {
-            const url = `https://overpass-api.de/api/interpreter`;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for full OSM data
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-            const response = await fetch(url, {
-              method: 'POST',
-              body: queries[i],
-              signal: controller.signal,
-              headers: { 'User-Agent': 'Crime-Report-Portal/1.0' }
-            });
+          const response = await fetch(url.toString(), {
+            signal: controller.signal,
+            headers: { 'User-Agent': 'Crime-Report-Portal/1.0' }
+          });
 
-            clearTimeout(timeoutId);
+          clearTimeout(timeoutId);
 
-            if (!response.ok) {
-              console.warn(`[Safe Places] Overpass HTTP ${response.status} for type ${i}`);
-              continue;
-            }
+          if (!response.ok) {
+            console.warn(`[Safe Places] Google API HTTP ${response.status} for ${searchType.label}`);
+            continue;
+          }
 
-            const text = await response.text();
-            
-            // Parse OSM JSON response
-            let osm;
-            try {
-              osm = JSON.parse(text);
-            } catch (e) {
-              console.warn(`[Safe Places] Failed to parse Overpass response for type ${i}: ${e instanceof Error ? e.message : String(e)}`);
-              console.warn(`[Safe Places] Response preview: ${text.substring(0, 200)}`);
-              continue;
-            }
-            
-            const type = typeMap[i as keyof typeof typeMap] || 'other';
-            
-            const foundCount = Array.isArray(osm.elements) ? osm.elements.filter((e: any) => e.lat && e.lon).length : 0;
-            console.log(`[Safe Places] Overpass returned ${foundCount} ${type} places`);
+          const data = await response.json();
 
-            if (Array.isArray(osm.elements)) {
-              for (const element of osm.elements) {
-                if (!element.lat || !element.lon) continue;
+          if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+            console.warn(`[Safe Places] Google API status: ${data.status} for ${searchType.label}`);
+            continue;
+          }
 
-                const placeId = `${element.type}-${element.id}`;
-                if (seenPlaces.has(placeId)) continue;
-                seenPlaces.add(placeId);
+          if (Array.isArray(data.results)) {
+            console.log(`[Safe Places] Found ${data.results.length} ${searchType.label} places from Google API`);
 
-                const distance = calculateDistance(userLat, userLon, element.lat, element.lon);
-                // Include places from 0.1km (100m) onwards up to 20km - ensure minimum places are shown
-                if (distance > radius) {
-                  console.log(`[Safe Places] Filtered out ${element.tags?.name || type}: ${distance.toFixed(2)}km > ${radius}km`);
-                  continue;
+            for (const result of data.results) {
+              const placeId = `google-${result.place_id}`;
+              if (seenPlaces.has(placeId)) continue;
+              seenPlaces.add(placeId);
+
+              const name = result.name || searchType.label;
+              const latitude = result.geometry.location.lat;
+              const longitude = result.geometry.location.lng;
+              const address = result.vicinity || '';
+              
+              // Get phone number from the place - requires detailed place info
+              let phone = '';
+              try {
+                // Use details endpoint to get phone number
+                const detailsUrl = new URL('https://maps.googleapis.com/maps/api/place/details/json');
+                detailsUrl.searchParams.append('place_id', result.place_id);
+                detailsUrl.searchParams.append('fields', 'formatted_phone_number,international_phone_number');
+                detailsUrl.searchParams.append('key', googleMapsApiKey);
+
+                const detailController = new AbortController();
+                const detailTimeoutId = setTimeout(() => detailController.abort(), 10000);
+
+                const detailResponse = await fetch(detailsUrl.toString(), {
+                  signal: detailController.signal,
+                  headers: { 'User-Agent': 'Crime-Report-Portal/1.0' }
+                });
+
+                clearTimeout(detailTimeoutId);
+
+                if (detailResponse.ok) {
+                  const detailData = await detailResponse.json();
+                  if (detailData.result && detailData.result.international_phone_number) {
+                    phone = detailData.result.international_phone_number;
+                  } else if (detailData.result && detailData.result.formatted_phone_number) {
+                    phone = detailData.result.formatted_phone_number;
+                  }
                 }
+              } catch (phoneError: any) {
+                console.warn(`[Safe Places] Error fetching phone for ${name}: ${phoneError.message}`);
+              }
 
-                const tags = element.tags || {};
-                const name = tags.name || `${type.charAt(0).toUpperCase() + type.slice(1)}`;
-                const phone = tags.phone || tags['contact:phone'] || "";
-                const address = tags['addr:street'] || tags['addr:full'] || `${type} location`;
+              const distance = calculateDistance(userLat, userLon, latitude, longitude);
 
+              if (distance <= 20) { // 20km radius
                 allPlaces.push({
                   id: placeId,
                   name: name,
-                  type: type,
-                  latitude: element.lat,
-                  longitude: element.lon,
+                  type: searchType.type,
+                  latitude: latitude,
+                  longitude: longitude,
                   address: address,
-                  phone: phone,
-                  distance: Math.round(distance * 1000), // Return distance in meters for accuracy
-                  rating: 0,
-                  isOpen: undefined
+                  phone: phone || 'N/A',
+                  distance: Math.round(distance * 1000), // Return distance in meters
+                  rating: result.rating || 0,
+                  isOpen: result.opening_hours?.open_now
                 });
+
+                console.log(`[Safe Places] Added from Google: ${name} (${searchType.label}) at ${distance.toFixed(2)}km, Phone: ${phone}`);
               }
             }
-          } catch (error: any) {
-            console.warn(`[Safe Places] Overpass error for type ${i}:`, error.message);
           }
-        }
-      } catch (error: any) {
-        console.warn(`[Safe Places] Overpass API failed:`, error.message);
-      }
-
-      // Always supplement with hardcoded database to ensure comprehensive results (fallback for offline areas)
-      console.log(`[Safe Places] Supplementing with comprehensive database for current location (${allPlaces.length} from Overpass)...`);
-      
-      const dbBefore = allPlaces.length;
-      for (const place of SAFE_PLACES_DB) {
-        const distance = calculateDistance(userLat, userLon, place.latitude, place.longitude);
-        
-        if (distance <= radius) {
-          const placeId = `db-${place.name}`;
-          if (!seenPlaces.has(placeId)) {
-            seenPlaces.add(placeId);
-            console.log(`[Safe Places] Adding from DB: ${place.name} (${place.type}) at ${distance.toFixed(2)}km`);
-            allPlaces.push({
-              id: placeId,
-              name: place.name,
-              type: place.type,
-              latitude: place.latitude,
-              longitude: place.longitude,
-              address: place.address,
-              phone: place.phone,
-              distance: Math.round(distance * 1000), // Return distance in meters for accuracy
-              rating: 0,
-              isOpen: undefined
-            });
-          }
+        } catch (error: any) {
+          console.warn(`[Safe Places] Error fetching ${searchType.label}:`, error.message);
         }
       }
-      const dbAdded = allPlaces.length - dbBefore;
-      console.log(`[Safe Places] Added ${dbAdded} places from hardcoded database`);
 
-      // Sort by distance only (nearest first, regardless of type)
+      // If Google API didn't return enough results, supplement with hardcoded database
+      if (allPlaces.length < 20) {
+        console.log(`[Safe Places] Google API returned ${allPlaces.length} results, supplementing with database...`);
+        for (const place of SAFE_PLACES_DB) {
+          const distance = calculateDistance(userLat, userLon, place.latitude, place.longitude);
+          
+          if (distance <= 20) {
+            const placeId = `db-${place.name}`;
+            if (!seenPlaces.has(placeId)) {
+              seenPlaces.add(placeId);
+              allPlaces.push({
+                id: placeId,
+                name: place.name,
+                type: place.type,
+                latitude: place.latitude,
+                longitude: place.longitude,
+                address: place.address,
+                phone: place.phone,
+                distance: Math.round(distance * 1000),
+                rating: 0,
+                isOpen: undefined
+              });
+              console.log(`[Safe Places] Supplemented from DB: ${place.name} (${place.type})`);
+            }
+          }
+        }
+      }
+
+      // Sort by distance (nearest first)
       allPlaces.sort((a, b) => a.distance - b.distance);
 
       const fetchTime = Date.now() - startTime;
@@ -1222,7 +1233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hospitals = allPlaces.filter(p => p.type === 'hospital').length;
       const pharmacies = allPlaces.filter(p => p.type === 'pharmacy').length;
       
-      console.log(`[Safe Places] ✓ Found ${allPlaces.length} places in ${fetchTime}ms. Police: ${police}, Hospitals: ${hospitals}, Pharmacies: ${pharmacies}`);
+      console.log(`[Safe Places] ✓ Found ${allPlaces.length} real verified places in ${fetchTime}ms. Police: ${police}, Hospitals: ${hospitals}, Pharmacies: ${pharmacies}`);
 
       res.json(allPlaces);
     } catch (error) {
@@ -1230,6 +1241,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json([]);
     }
   });
+
+  // Helper function to send fallback places from hardcoded database
+  function sendFallbackPlaces(userLat: number, userLon: number, res: any) {
+    try {
+      const allPlaces: any[] = [];
+      const radius = 20;
+
+      for (const place of SAFE_PLACES_DB) {
+        const distance = calculateDistance(userLat, userLon, place.latitude, place.longitude);
+        if (distance <= radius) {
+          allPlaces.push({
+            id: `db-${place.name}`,
+            name: place.name,
+            type: place.type,
+            latitude: place.latitude,
+            longitude: place.longitude,
+            address: place.address,
+            phone: place.phone,
+            distance: Math.round(distance * 1000),
+            rating: 0,
+            isOpen: undefined
+          });
+        }
+      }
+
+      allPlaces.sort((a, b) => a.distance - b.distance);
+      console.log(`[Safe Places] Fallback: Found ${allPlaces.length} places from database`);
+      res.json(allPlaces);
+    } catch (error) {
+      console.error("[Safe Places] Fallback error:", error);
+      res.json([]);
+    }
+  }
 
   // ============= ADMIN ROUTES =============
   
