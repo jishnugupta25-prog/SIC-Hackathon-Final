@@ -157,8 +157,29 @@ export default function CrimeMap() {
       Robbery: "#0ea5e9",
       Vandalism: "#eab308",
       "Vehicle Theft": "#10b981",
-      Fraud: "#f97316",
-      Harassment: "#ef4444",
+      Fraud: "#f59e0b",
+      Harassment: "#ec4899",
+      "Sexual Assault": "#dc2626",
+      Rape: "#7c2d12",
+      Murder: "#1e1b4b",
+      Kidnapping: "#6366f1",
+      Stalking: "#8b5cf6",
+      "Drug Trafficking": "#14b8a6",
+      "Human Trafficking": "#f43f5e",
+      Arson: "#ea580c",
+      Cybercrime: "#06b6d4",
+      "Money Laundering": "#a16207",
+      "Animal Cruelty": "#d97706",
+      "Animal Abuse": "#ca8a04",
+      "Domestic Violence": "#be123c",
+      "Child Abuse": "#be185d",
+      Pickpocketing: "#7dd3fc",
+      Mugging: "#fca5a5",
+      Blackmail: "#fed7aa",
+      Extortion: "#fbbf24",
+      Trespassing: "#86efac",
+      "Drunk Driving": "#a78bfa",
+      "Hit and Run": "#fda4af",
       Other: "#6b7280",
     };
 
@@ -196,15 +217,11 @@ export default function CrimeMap() {
 
     const color = (type: string) => crimeColors[type] || "#6b7280";
 
-    const legendItems = [
-      { type: "Theft", color: crimeColors.Theft },
-      { type: "Burglary", color: crimeColors.Burglary },
-      { type: "Assault", color: crimeColors.Assault },
-      { type: "Robbery", color: crimeColors.Robbery },
-      { type: "Vandalism", color: crimeColors.Vandalism },
-      { type: "Vehicle Theft", color: crimeColors["Vehicle Theft"] },
-      { type: "Other", color: crimeColors.Other },
-    ];
+    // Generate legend items from all available crime types
+    const legendItems = Object.entries(crimeColors).map(([type, color]) => ({
+      type,
+      color,
+    }));
 
     const html = `
       <div style="position: relative; width: 100%; height: 100%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
@@ -223,12 +240,12 @@ export default function CrimeMap() {
             </div>
           `;
         }).join('')}
-        <button id="legend-toggle" style="position: absolute; top: 12px; left: 12px; background: white; border: 1px solid #ddd; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 12px; color: #333; box-shadow: 0 2px 6px rgba(0,0,0,0.12); z-index: 15; transition: all 0.2s; height: fit-content;">▼</button>
-        <div id="legend-content" style="position: absolute; top: 44px; left: 12px; background: white; padding: 8px 10px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 15; border: 1px solid #ddd; display: none; width: 160px; min-width: 160px;">
+        <button id="legend-toggle" style="position: absolute; top: 12px; left: 12px; background: white; border: 1px solid #ddd; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 12px; color: #333; box-shadow: 0 2px 6px rgba(0,0,0,0.12); z-index: 15; transition: all 0.2s; height: fit-content;">▼ Legend</button>
+        <div id="legend-content" style="position: absolute; top: 44px; left: 12px; background: white; padding: 10px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 15; border: 1px solid #ddd; display: none; width: 200px; max-height: 400px; overflow-y: auto;">
           ${legendItems.map((item) => `
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 11px; color: #555; padding: 4px 0;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; color: #555; padding: 3px 0;">
               <div style="width: 14px; height: 14px; background-color: ${item.color}; border: 2px solid ${item.color}; border-radius: 50%; flex-shrink: 0;"></div>
-              <span>${item.type}</span>
+              <span style="word-break: break-word;">${item.type}</span>
             </div>
           `).join('')}
         </div>
