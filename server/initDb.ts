@@ -3,6 +3,8 @@ export async function initializeDatabase() {
   try {
     console.log("Initializing database schema...");
     
+    // Import bcrypt for password hashing
+    const bcrypt = await import("bcryptjs");
     const isPostgres = process.env.DATABASE_URL ? true : false;
     
     if (isPostgres) {
@@ -199,9 +201,73 @@ export async function initializeDatabase() {
       sqlite.close();
     }
     
+    // Seed default admin if none exists
+    await seedDefaultAdmin(isPostgres, bcrypt.default);
+    
     console.log("✅ Database schema initialized successfully");
   } catch (error: any) {
     console.error("❌ Database schema initialization error:", error?.message);
     throw error;
+  }
+}
+
+// Seed default admin account
+async function seedDefaultAdmin(isPostgres: boolean, bcrypt: any) {
+  try {
+    const crypto = await import('crypto');
+    const defaultEmail = "admin@crimereport.local";
+    const defaultPassword = "admin@123";
+    
+    if (isPostgres) {
+      const { Pool, neonConfig } = await import('@neondatabase/serverless');
+      const ws = await import("ws");
+      
+      neonConfig.webSocketConstructor = ws.default;
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      
+      // Check if admin already exists
+      const result = await pool.query(
+        'SELECT id FROM admins WHERE email = $1',
+        [defaultEmail]
+      );
+      
+      if (result.rowCount === 0) {
+        const passwordHash = await bcrypt.hash(defaultPassword, 10);
+        const adminId = crypto.randomUUID();
+        
+        await pool.query(
+          'INSERT INTO admins (id, email, password_hash, full_name) VALUES ($1, $2, $3, $4)',
+          [adminId, defaultEmail, passwordHash, "System Administrator"]
+        );
+        
+        console.log(`✅ Default admin created: ${defaultEmail}`);
+      }
+      
+      await pool.end();
+    } else {
+      const Database = await import('better-sqlite3');
+      const sqlite = new Database.default('/tmp/crime-portal.db');
+      
+      // Check if admin already exists
+      const stmt = sqlite.prepare('SELECT id FROM admins WHERE email = ?');
+      const admin = stmt.get(defaultEmail);
+      
+      if (!admin) {
+        const passwordHash = await bcrypt.hash(defaultPassword, 10);
+        const adminId = crypto.randomUUID();
+        
+        const insertStmt = sqlite.prepare(
+          'INSERT INTO admins (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)'
+        );
+        insertStmt.run(adminId, defaultEmail, passwordHash, "System Administrator");
+        
+        console.log(`✅ Default admin created: ${defaultEmail}`);
+      }
+      
+      sqlite.close();
+    }
+  } catch (error: any) {
+    // Don't throw - this is non-critical
+    console.warn(`⚠️  Could not seed default admin: ${error.message}`);
   }
 }
