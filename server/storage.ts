@@ -49,6 +49,7 @@ export interface IStorage {
 
   // Admin operations
   getAdminByEmail(email: string): Promise<Admin | undefined>;
+  getAdminById(id: string): Promise<Admin | undefined>;
   getCrimesForReview(): Promise<(CrimeReport & { approval: CrimeApproval | null })[]>;
   approveCrime(crimeId: string, adminId: string): Promise<CrimeApproval>;
   rejectCrime(crimeId: string, adminId: string): Promise<CrimeApproval>;
@@ -189,6 +190,12 @@ export class DatabaseStorage implements IStorage {
   async getAdminByEmail(email: string): Promise<Admin | undefined> {
     const db = await getDb();
     const [admin] = await db.select().from(admins).where(eq(admins.email, email));
+    return admin;
+  }
+
+  async getAdminById(id: string): Promise<Admin | undefined> {
+    const db = await getDb();
+    const [admin] = await db.select().from(admins).where(eq(admins.id, id));
     return admin;
   }
 

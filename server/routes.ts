@@ -115,24 +115,26 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 async function isAdmin(req: any, res: any, next: any) {
   try {
     if (!req.user || !req.user.claims || !req.user.claims.sub) {
+      console.error("[Admin Check] Missing user or claims");
       return res.status(403).json({ message: "Admin access required" });
     }
     
-    // Check if user ID exists in admins table (admin.id === req.user.claims.sub)
-    // When admin logs in, sub is set to admin.id
-    const db = await (await import("./db")).getDb();
-    const { admins } = await import("@shared/schema");
-    const { eq } = await import("drizzle-orm");
+    const userId = req.user.claims.sub;
+    console.log(`[Admin Check] Checking admin status for user: ${userId}`);
     
-    const [admin] = await db.select().from(admins).where(eq(admins.id, req.user.claims.sub));
+    // Check if user ID exists in admins table
+    const admin = await storage.getAdminById(userId);
+    
     if (!admin) {
+      console.error(`[Admin Check] User ${userId} is not an admin`);
       return res.status(403).json({ message: "Admin access required" });
     }
     
-    // Attach admin to request for later use
+    console.log(`[Admin Check] ✓ User ${userId} is admin: ${admin.email}`);
     req.admin = admin;
     next();
   } catch (error) {
+    console.error("[Admin Check] Error:", error);
     return res.status(403).json({ message: "Admin access required" });
   }
 }
