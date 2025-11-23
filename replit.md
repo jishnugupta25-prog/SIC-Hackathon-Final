@@ -16,6 +16,16 @@ The Crime Report Portal is a full-stack safety application that enables users to
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+**November 23, 2025:**
+- Merged admin login with main user login page
+  - Added "System Admin Login" button on `/login` page for convenience
+  - Admins no longer need to navigate to separate `/admin-login` URL
+  - Single unified login page with toggle between user and admin modes
+  - Both authentication flows fully functional and tested
+  - Fixed admin session persistence by adding `credentials: "include"` to fetch requests
+
 ## System Architecture
 
 ### Frontend Architecture
