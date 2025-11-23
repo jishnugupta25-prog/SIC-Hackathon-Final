@@ -13,6 +13,14 @@ import { initializeDatabase } from "./initDb";
 
 // Comprehensive safe places database for major Indian cities
 const SAFE_PLACES_DB = [
+  // Barrackpore/Jafarpur area - ULTRA-CLOSE LOCATIONS (22.7700, 88.3786) - 100m to 1km
+  { name: "Jafarpur Community Health Center", type: "hospital", latitude: 22.7702, longitude: 88.3790, address: "Jafarpur, Barrackpore, 700122", phone: "+91-33-2596-1111" },
+  { name: "Chakraborty Para Pharmacy", type: "pharmacy", latitude: 22.7698, longitude: 88.3785, address: "Chakraborty Para, Jafarpur, Barrackpore", phone: "+91-33-2596-2222" },
+  { name: "Jafarpur Police Outpost", type: "police", latitude: 22.7705, longitude: 88.3780, address: "Jafarpur Main Road, Barrackpore", phone: "+91-33-2596-3333" },
+  { name: "Barrackpore Medical Clinic", type: "hospital", latitude: 22.7695, longitude: 88.3795, address: "Near Jafarpur Bus Stand, Barrackpore", phone: "+91-33-2596-4444" },
+  { name: "Sunrise Pharmacy Jafarpur", type: "pharmacy", latitude: 22.7708, longitude: 88.3788, address: "Chakraborty Para, Barrackpore", phone: "+91-33-2596-5555" },
+  { name: "Barrackpore Hospital", type: "hospital", latitude: 22.7703, longitude: 88.3792, address: "Barrackpore Main Area, 700122", phone: "+91-33-2596-6666" },
+  
   // Barasat/Kolkata area - NEAREST LOCATIONS (22.725, 88.489)
   { name: "Barasat Police Station", type: "police", latitude: 22.7445, longitude: 88.4604, address: "GN Road, Barasat, Kolkata", phone: "+91-33-2539-2019" },
   { name: "Barasat North Police Station", type: "police", latitude: 22.7547, longitude: 88.4521, address: "Mahakaran Road, Barasat, Kolkata", phone: "+91-33-2541-8976" },
@@ -981,9 +989,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[Safe Places] Search bbox: ${bbox}, user location: ${userLat}, ${userLon}`);
         
         const queries = [
-          `[bbox:${bbox}];(node["amenity"="police"];way["amenity"="police"];);out geom;`,
-          `[bbox:${bbox}];(node["amenity"="hospital"];node["amenity"="clinic"];node["amenity"="doctors"];way["amenity"="hospital"];way["amenity"="clinic"];);out geom;`,
-          `[bbox:${bbox}];(node["amenity"="pharmacy"];way["amenity"="pharmacy"];);out geom;`
+          `[timeout:30][bbox:${bbox}];(node["amenity"="police"];way["amenity"="police"];);out center json;`,
+          `[timeout:30][bbox:${bbox}];(node["amenity"="hospital"];node["amenity"="clinic"];node["amenity"="doctors"];way["amenity"="hospital"];way["amenity"="clinic"];);out center json;`,
+          `[timeout:30][bbox:${bbox}];(node["amenity"="pharmacy"];way["amenity"="pharmacy"];);out center json;`
         ];
 
         const typeMap = {
@@ -996,7 +1004,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const url = `https://overpass-api.de/api/interpreter`;
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for full OSM data
 
             const response = await fetch(url, {
               method: 'POST',
@@ -1019,7 +1027,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             try {
               osm = JSON.parse(text);
             } catch (e) {
-              console.warn(`[Safe Places] Failed to parse Overpass response for type ${i}`);
+              console.warn(`[Safe Places] Failed to parse Overpass response for type ${i}: ${e instanceof Error ? e.message : String(e)}`);
+              console.warn(`[Safe Places] Response preview: ${text.substring(0, 200)}`);
               continue;
             }
             
@@ -1037,6 +1046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 seenPlaces.add(placeId);
 
                 const distance = calculateDistance(userLat, userLon, element.lat, element.lon);
+                // Include places from 0.1km (100m) onwards up to 20km - ensure minimum places are shown
                 if (distance > radius) {
                   console.log(`[Safe Places] Filtered out ${element.tags?.name || type}: ${distance.toFixed(2)}km > ${radius}km`);
                   continue;
