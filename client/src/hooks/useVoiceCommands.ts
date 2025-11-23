@@ -25,10 +25,11 @@ export function useVoiceCommands(config: VoiceCommandConfig) {
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
 
-    // Configuration
+    // Configuration for improved accuracy
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'en-IN'; // Support Indian English
+    recognition.lang = 'en-US'; // Use US English for better keyword matching
+    recognition.maxAlternatives = 1; // Get best match only
 
     recognition.onstart = () => {
       setIsListening(true);
@@ -38,22 +39,40 @@ export function useVoiceCommands(config: VoiceCommandConfig) {
 
     recognition.onresult = (event: any) => {
       let transcript = '';
+      let isFinal = false;
 
       // Collect results from all events
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const isFinal = event.results[i].isFinal;
         const result = event.results[i][0].transcript.toLowerCase().trim();
-        transcript += result;
-
+        isFinal = event.results[i].isFinal;
+        
         if (isFinal) {
-          console.log(`[Voice Commands] Detected: "${result}"`);
-
-          // Check if any keyword is in the transcript
+          transcript = result;
+          console.log(`[Voice Commands] Final result: "${result}"`);
+          
+          // Check each keyword with improved matching
           for (const keyword of config.keywords) {
-            if (transcript.includes(keyword.toLowerCase())) {
-              console.log(`[Voice Commands] ✓ Keyword matched: "${keyword}"`);
+            const keywordLower = keyword.toLowerCase();
+            
+            // Exact match
+            if (transcript === keywordLower) {
+              console.log(`[Voice Commands] ✓ Exact match: "${keyword}"`);
               config.onCommandDetected(keyword);
-              break;
+              return;
+            }
+            
+            // Partial match - keyword is contained in transcript
+            if (transcript.includes(keywordLower)) {
+              console.log(`[Voice Commands] ✓ Partial match: "${keyword}" found in "${transcript}"`);
+              config.onCommandDetected(keyword);
+              return;
+            }
+            
+            // Fuzzy match - allow for slight variations (typos, accents)
+            if (fuzzyMatch(transcript, keywordLower)) {
+              console.log(`[Voice Commands] ✓ Fuzzy match: "${keyword}" matched with "${transcript}"`);
+              config.onCommandDetected(keyword);
+              return;
             }
           }
         }
@@ -78,7 +97,7 @@ export function useVoiceCommands(config: VoiceCommandConfig) {
               console.log('[Voice Commands] Restarting listening...');
               recognitionRef.current.start();
             }
-          }, 100);
+          }, 50); // Faster restart for better responsiveness
         } catch (error) {
           console.log('[Voice Commands] Auto-restart failed:', error);
         }
@@ -119,4 +138,42 @@ export function useVoiceCommands(config: VoiceCommandConfig) {
     isListening,
     stopListening,
   };
+}
+
+// Fuzzy matching for voice recognition variations
+function fuzzyMatch(input: string, keyword: string): boolean {
+  // Allow up to 1 character difference for keywords <= 4 chars
+  // Allow up to 2 character differences for longer keywords
+  const maxDistance = keyword.length <= 4 ? 1 : 2;
+  return levenshteinDistance(input, keyword) <= maxDistance;
+}
+
+// Calculate Levenshtein distance between two strings
+function levenshteinDistance(str1: string, str2: string): number {
+  const m = str1.length;
+  const n = str2.length;
+  
+  // Create a 2D array for dynamic programming
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  
+  // Initialize first row and column
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  
+  // Fill the DP table
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = 1 + Math.min(
+          dp[i - 1][j],      // deletion
+          dp[i][j - 1],      // insertion
+          dp[i - 1][j - 1]   // substitution
+        );
+      }
+    }
+  }
+  
+  return dp[m][n];
 }
