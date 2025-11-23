@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock, X, Navigation, Phone, Users, TrendingUp, BarChart3, RefreshCw } from "lucide-react";
+import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock, X, Navigation, Phone, Users, TrendingUp, BarChart3, RefreshCw, ArrowDownUp } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -61,6 +61,7 @@ export default function AdminPanel() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState<"all" | "pending" | "approved" | "rejected">("all");
 
   // Check if admin is authenticated on component mount
   useEffect(() => {
@@ -207,6 +208,24 @@ export default function AdminPanel() {
   const pendingCrimes = crimes.filter((c) => !c.approval || c.approval.status === "pending");
   const approvedCrimes = crimes.filter((c) => c.approval?.status === "approved");
   const rejectedCrimes = crimes.filter((c) => c.approval?.status === "rejected");
+
+  // Sort crimes based on selected option (pending > approved > rejected)
+  const sortedCrimes = [...crimes].sort((a, b) => {
+    if (sortBy === "all") {
+      // Default sort: pending first, then approved, then rejected
+      const statusOrder = { pending: 0, approved: 1, rejected: 2 };
+      const aStatus = a.approval?.status || "pending";
+      const bStatus = b.approval?.status || "pending";
+      return statusOrder[aStatus as keyof typeof statusOrder] - statusOrder[bStatus as keyof typeof statusOrder];
+    } else if (sortBy === "pending") {
+      return (a.approval?.status || "pending") === "pending" ? -1 : 1;
+    } else if (sortBy === "approved") {
+      return a.approval?.status === "approved" ? -1 : 1;
+    } else if (sortBy === "rejected") {
+      return a.approval?.status === "rejected" ? -1 : 1;
+    }
+    return 0;
+  });
 
   // Calculate user tracking statistics
   const totalUsers = usersTracking.length;
@@ -471,13 +490,67 @@ export default function AdminPanel() {
       {/* Crime Reports List */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5" />
-            Crime Reports
-          </CardTitle>
-          <CardDescription>
-            {isLoading ? "Loading..." : `${crimes.length} reports total`}
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Crime Reports
+              </CardTitle>
+              <CardDescription>
+                {isLoading ? "Loading..." : `${crimes.length} reports total`}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-muted-foreground">Sort by:</span>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setSortBy("all")}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    sortBy === "all"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary/50 text-secondary-foreground hover:bg-secondary"
+                  }`}
+                  data-testid="button-sort-all"
+                >
+                  <ArrowDownUp className="h-4 w-4 inline mr-1" />
+                  All
+                </button>
+                <button
+                  onClick={() => setSortBy("pending")}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    sortBy === "pending"
+                      ? "bg-yellow-500 text-white"
+                      : "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-500/30"
+                  }`}
+                  data-testid="button-sort-pending"
+                >
+                  Pending
+                </button>
+                <button
+                  onClick={() => setSortBy("approved")}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    sortBy === "approved"
+                      ? "bg-green-500 text-white"
+                      : "bg-green-500/20 text-green-700 dark:text-green-400 hover:bg-green-500/30"
+                  }`}
+                  data-testid="button-sort-approved"
+                >
+                  Approved
+                </button>
+                <button
+                  onClick={() => setSortBy("rejected")}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    sortBy === "rejected"
+                      ? "bg-red-500 text-white"
+                      : "bg-red-500/20 text-red-700 dark:text-red-400 hover:bg-red-500/30"
+                  }`}
+                  data-testid="button-sort-rejected"
+                >
+                  Rejected
+                </button>
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -486,7 +559,7 @@ export default function AdminPanel() {
             <div className="text-center text-muted-foreground py-8">No reports found</div>
           ) : (
             <div className="space-y-2">
-              {crimes.map((crime) => (
+              {sortedCrimes.map((crime) => (
                 <div
                   key={crime.id}
                   onClick={() => handleSelectCrime(crime.id)}
