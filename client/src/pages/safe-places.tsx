@@ -869,7 +869,9 @@ export default function SafePlaces() {
                             </p>
                             {place.distance !== undefined && (
                               <Badge variant="secondary" className="mt-2 text-xs">
-                                {place.distance.toFixed(1)} km away
+                                {place.distance < 1000 
+                                  ? `${Math.round(place.distance)} m away` 
+                                  : `${(place.distance / 1000).toFixed(2)} km away`}
                               </Badge>
                             )}
                           </div>

@@ -965,7 +965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Safe Places] Fetching REAL-TIME nearby safe places for ANY location: ${userLat}, ${userLon}`);
 
-      const radius = 100; // 100km search radius - show all nearby safe places (can include 100+ results)
+      const radius = 20; // 20km search radius (100m to 20km) - show all nearby safe places with meter accuracy
       const radiusMeters = radius * 1000;
       const allPlaces: any[] = [];
       const seenPlaces = new Set<string>();
@@ -1055,7 +1055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   longitude: element.lon,
                   address: address,
                   phone: phone,
-                  distance: Math.round(distance * 100) / 100,
+                  distance: Math.round(distance * 1000), // Return distance in meters for accuracy
                   rating: 0,
                   isOpen: undefined
                 });
@@ -1089,7 +1089,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               longitude: place.longitude,
               address: place.address,
               phone: place.phone,
-              distance: Math.round(distance * 100) / 100,
+              distance: Math.round(distance * 1000), // Return distance in meters for accuracy
               rating: 0,
               isOpen: undefined
             });
