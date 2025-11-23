@@ -1520,9 +1520,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[Safe Routes API] Start:", start, "End:", end);
 
-      // Calculate base distance
+      // Calculate base distance using Haversine formula
       const baseDistance = calculateDistance(start.lat, start.lon, end.lat, end.lon);
+      console.log("[Safe Routes API] Calculated base distance:", baseDistance, "km");
       const baseDuration = Math.round(baseDistance * 2.5); // Rough estimate: 2.5 min per km
+      console.log("[Safe Routes API] Base duration:", baseDuration, "minutes");
 
       // Calculate crime density in grid cells
       const gridSize = 0.01;
@@ -1538,11 +1540,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Generate 3 alternative routes with different characteristics
+      const safestDistance = Math.round((baseDistance * 1.15) * 10) / 10;
+      const balancedDistance = Math.round((baseDistance * 1.05) * 10) / 10;
+      const fastestDistance = Math.round(baseDistance * 10) / 10;
+
+      console.log("[Safe Routes API] Route distances - Safest:", safestDistance, "Balanced:", balancedDistance, "Fastest:", fastestDistance);
+
       const routes = [
         {
           id: "safest",
           name: "Safest Route",
-          distance: baseDistance * 1.15, // 15% longer for safety
+          distance: safestDistance,
           duration: Math.round(baseDuration * 1.15),
           crimeCount: 0,
           safetyScore: 1.0,
@@ -1555,7 +1563,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           id: "balanced",
           name: "Balanced Route",
-          distance: baseDistance * 1.05, // 5% longer for balance
+          distance: balancedDistance,
           duration: Math.round(baseDuration * 1.05),
           crimeCount: 1,
           safetyScore: 0.75,
@@ -1568,7 +1576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           id: "fastest",
           name: "Fastest Route",
-          distance: baseDistance,
+          distance: fastestDistance,
           duration: baseDuration,
           crimeCount: 3,
           safetyScore: 0.5,

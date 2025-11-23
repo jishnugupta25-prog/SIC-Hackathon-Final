@@ -680,7 +680,7 @@ export default function SafeRoutes() {
 
       {/* Route Details Modal */}
       <Dialog open={showRouteModal} onOpenChange={setShowRouteModal}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="dialog-route-details">
+        <DialogContent className="max-w-2xl max-h-[95vh] overflow-hidden flex flex-col" data-testid="dialog-route-details">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MapIcon className="h-5 w-5" />
@@ -690,12 +690,12 @@ export default function SafeRoutes() {
           </DialogHeader>
 
           {selectedRoute && (
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto flex-1 pr-4">
               {/* Route Map */}
               <div
                 id="route-modal-map"
-                className="bg-muted rounded-md"
-                style={{ height: "200px" }}
+                className="bg-muted rounded-md w-full"
+                style={{ height: "350px", minHeight: "350px" }}
               />
 
               {/* Route Details */}
