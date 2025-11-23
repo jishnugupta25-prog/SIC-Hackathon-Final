@@ -63,7 +63,6 @@ const crimeTypes = [
   "Blackmail",
   "Extortion",
   "Trespassing",
-  "Stalking",
   "Drunk Driving",
   "Hit and Run",
   "Other",
