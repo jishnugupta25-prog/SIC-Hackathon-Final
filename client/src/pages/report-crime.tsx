@@ -179,16 +179,14 @@ export default function ReportCrime() {
 
   const reportMutation = useMutation({
     mutationFn: async (data: ReportFormData) => {
-      return await apiRequest("POST", "/api/crimes", data);
+      const res = await apiRequest("POST", "/api/crimes", data);
+      return await res.json();
     },
     onSuccess: (data: any) => {
-      console.log("Crime submitted response:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/crimes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crimes/recent"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/crimes"] });
-      const refNum = data?.referenceNumber || data?.reference_number;
-      console.log("Reference number extracted:", refNum);
-      setReferenceNumber(refNum);
+      setReferenceNumber(data?.referenceNumber);
       setIsSuccess(true);
       toast({
         title: "Crime Reported",
