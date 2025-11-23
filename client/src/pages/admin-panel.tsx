@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock, X, Navigation } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 type CrimeForReview = {
   id: string;
@@ -188,10 +189,13 @@ export default function AdminPanel() {
           <h1 className="text-3xl font-bold">Admin Panel</h1>
           <p className="text-muted-foreground mt-1">Review and manage crime reports</p>
         </div>
-        <Button variant="destructive" onClick={handleLogout} data-testid="button-logout">
-          <LogOut className="h-4 w-4 mr-2" />
-          Logout
-        </Button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Button variant="destructive" onClick={handleLogout} data-testid="button-logout">
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
