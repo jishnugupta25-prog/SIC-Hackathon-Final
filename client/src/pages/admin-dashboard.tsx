@@ -67,16 +67,9 @@ export default function AdminDashboard() {
     refetchInterval: autoRefresh ? 3000 : false, // Refresh every 3 seconds
   });
 
-  // Fetch user tracking data with crime counts
-  const { data: usersTrackingData, isLoading: usersTrackingLoading } = useQuery({
-    queryKey: ["/api/admin/users-tracking"],
-    refetchInterval: autoRefresh ? 3000 : false, // Refresh every 3 seconds
-  });
-
   const sessions: AdminSession[] = Array.isArray(sessionsData) ? sessionsData : [];
   const reports: AdminReport[] = Array.isArray(reportsData) ? reportsData : [];
   const safetyScores: any[] = Array.isArray(safetyScoresData) ? safetyScoresData : [];
-  const usersTracking: UserTracking[] = Array.isArray(usersTrackingData) ? usersTrackingData : [];
 
   const activeSessions = sessions.filter(
     (s) => new Date(s.sessionExpire) > new Date()
@@ -171,18 +164,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <UserCheck className="h-4 w-4 text-chart-2" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{usersTracking.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {usersTracking.filter(u => u.isActive).length} currently active
-            </p>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Active Sessions Table */}
@@ -307,66 +288,6 @@ export default function AdminDashboard() {
         </CardContent>
       </Card>
 
-      {/* User Tracking Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            User Tracking & Crime Reports
-          </CardTitle>
-          <CardDescription>
-            All registered users with their account details and crime report counts {autoRefresh && "(auto-updating)"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {usersTrackingLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="text-muted-foreground">Loading user data...</div>
-            </div>
-          ) : usersTracking.length === 0 ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="text-muted-foreground">No users registered yet</div>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Crimes Reported</TableHead>
-                  <TableHead>Member Since</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {usersTracking.map((user) => (
-                  <TableRow key={user.userId} data-testid={`row-user-${user.userId}`}>
-                    <TableCell className="font-medium">
-                      {user.firstName && user.lastName
-                        ? `${user.firstName} ${user.lastName}`
-                        : "No Name"}
-                    </TableCell>
-                    <TableCell className="text-sm">{user.email}</TableCell>
-                    <TableCell className="text-center font-semibold">{user.crimeCount}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {user.createdAt
-                        ? formatDistanceToNow(new Date(user.createdAt), {
-                            addSuffix: true,
-                          })
-                        : "Unknown"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge className={user.isActive ? "bg-green-500/20 text-green-700 dark:text-green-400" : "bg-gray-500/20 text-gray-700 dark:text-gray-400"}>
-                        {user.isActive ? "Online" : "Offline"}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Crime Reports Table */}
       <Card>

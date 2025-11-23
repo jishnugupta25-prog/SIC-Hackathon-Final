@@ -23,6 +23,7 @@ import AdminPanel from "@/pages/admin-panel";
 import Signup from "@/pages/signup";
 import Login from "@/pages/login";
 import MyCrimeReports from "@/pages/my-crime-reports";
+import AdminUsersTracking from "@/pages/admin-users-tracking";
 
 function Router() {
   return (
@@ -36,6 +37,8 @@ function Router() {
       <Route path="/safe-places" component={SafePlaces} />
       <Route path="/my-reports" component={MyCrimeReports} />
       <Route path="/admin-login" component={AdminLogin} />
+      <Route path="/admin" component={AdminPanel} />
+      <Route path="/admin/users" component={AdminUsersTracking} />
       <Route path="/admin-panel" component={AdminPanel} />
       <Route component={NotFound} />
     </Switch>
