@@ -1475,6 +1475,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to get all crimes
+  async function getAllCrimesForRoutes() {
+    try {
+      const { crimeReports: crimeReportsTable } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const crimes = await db.select().from(crimeReportsTable);
+      return crimes;
+    } catch {
+      return [];
+    }
+  }
+
   // Safe Routes API - Suggest safer alternative routes avoiding crime hotspots
   app.post('/api/suggest-safer-routes', isAuthenticated, async (req: any, res) => {
     try {
@@ -1485,7 +1497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all crimes to analyze hotspots
-      const crimes = await storage.getAllCrimes();
+      const crimes = await getAllCrimesForRoutes();
 
       // Parse location coordinates (for demo, using simple parsing)
       // In production, would use geocoding service
@@ -1572,18 +1584,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     return points;
-  }
-
-  // Get all crimes (helper function)
-  async function getAllCrimes() {
-    try {
-      const { crimeReports: crimeReportsTable } = await import("@shared/schema");
-      const { db } = await import("./db");
-      const crimes = await db.select().from(crimeReportsTable);
-      return crimes;
-    } catch {
-      return [];
-    }
   }
 
   const httpServer = createServer(app);
