@@ -7,6 +7,9 @@ import {
   emergencyContacts,
   crimeReports,
   sosAlerts,
+  admins,
+  crimeApprovals,
+  adminFeedback,
   type User,
   type UpsertUser,
   type EmergencyContact,
@@ -15,6 +18,10 @@ import {
   type InsertCrimeReport,
   type SosAlert,
   type InsertSosAlert,
+  type Admin,
+  type CrimeApproval,
+  type AdminFeedback,
+  type InsertAdminFeedback,
 } from "@shared/schema";
 import { getDb } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -39,6 +46,14 @@ export interface IStorage {
   // SOS Alerts operations
   createSosAlert(alert: InsertSosAlert): Promise<SosAlert>;
   getUserSosAlerts(userId: string): Promise<SosAlert[]>;
+
+  // Admin operations
+  getAdminByEmail(email: string): Promise<Admin | undefined>;
+  getCrimesForReview(): Promise<(CrimeReport & { approval: CrimeApproval | null })[]>;
+  approveCrime(crimeId: string, adminId: string): Promise<CrimeApproval>;
+  rejectCrime(crimeId: string, adminId: string): Promise<CrimeApproval>;
+  createAdminFeedback(feedback: InsertAdminFeedback): Promise<AdminFeedback>;
+  getUserFeedback(userId: string): Promise<AdminFeedback[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -168,6 +183,99 @@ export class DatabaseStorage implements IStorage {
       .where(eq(sosAlerts.userId, userId))
       .orderBy(desc(sosAlerts.createdAt))
       .limit(50);
+  }
+
+  // Admin operations
+  async getAdminByEmail(email: string): Promise<Admin | undefined> {
+    const db = await getDb();
+    const [admin] = await db.select().from(admins).where(eq(admins.email, email));
+    return admin;
+  }
+
+  async getCrimesForReview(): Promise<(CrimeReport & { approval: CrimeApproval | null })[]> {
+    const db = await getDb();
+    // Get all crimes with their approval status
+    const crimes = await db
+      .select({
+        crime: crimeReports,
+        approval: crimeApprovals,
+      })
+      .from(crimeReports)
+      .leftJoin(crimeApprovals, eq(crimeReports.id, crimeApprovals.crimeId))
+      .orderBy(desc(crimeReports.createdAt));
+    
+    return crimes.map((row: any) => ({
+      ...row.crime,
+      approval: row.approval,
+    })) as (CrimeReport & { approval: CrimeApproval | null })[];
+  }
+
+  async approveCrime(crimeId: string, adminId: string): Promise<CrimeApproval> {
+    const db = await getDb();
+    const now = new Date();
+    const [approval] = await db
+      .insert(crimeApprovals)
+      .values({
+        id: randomUUID(),
+        crimeId,
+        adminId,
+        status: "approved",
+        reviewedAt: now,
+        createdAt: now,
+      })
+      .onConflictDoUpdate({
+        target: crimeApprovals.crimeId,
+        set: {
+          status: "approved",
+          adminId,
+          reviewedAt: now,
+        },
+      })
+      .returning();
+    return approval;
+  }
+
+  async rejectCrime(crimeId: string, adminId: string): Promise<CrimeApproval> {
+    const db = await getDb();
+    const now = new Date();
+    const [approval] = await db
+      .insert(crimeApprovals)
+      .values({
+        id: randomUUID(),
+        crimeId,
+        adminId,
+        status: "rejected",
+        reviewedAt: now,
+        createdAt: now,
+      })
+      .onConflictDoUpdate({
+        target: crimeApprovals.crimeId,
+        set: {
+          status: "rejected",
+          adminId,
+          reviewedAt: now,
+        },
+      })
+      .returning();
+    return approval;
+  }
+
+  async createAdminFeedback(feedback: InsertAdminFeedback): Promise<AdminFeedback> {
+    const db = await getDb();
+    const [newFeedback] = await db
+      .insert(adminFeedback)
+      .values({ ...feedback, id: randomUUID(), createdAt: new Date() })
+      .returning();
+    return newFeedback;
+  }
+
+  async getUserFeedback(userId: string): Promise<AdminFeedback[]> {
+    const db = await getDb();
+    return await db
+      .select()
+      .from(adminFeedback)
+      .where(eq(adminFeedback.userId, userId))
+      .orderBy(desc(adminFeedback.createdAt));
   }
 }
 

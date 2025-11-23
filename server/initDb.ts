@@ -63,6 +63,34 @@ export async function initializeDatabase() {
           "created_at" timestamp DEFAULT current_timestamp
         );
 
+        CREATE TABLE IF NOT EXISTS "admins" (
+          "id" text PRIMARY KEY DEFAULT gen_random_uuid(),
+          "email" text UNIQUE NOT NULL,
+          "password_hash" text NOT NULL,
+          "full_name" text,
+          "created_at" timestamp DEFAULT current_timestamp
+        );
+
+        CREATE TABLE IF NOT EXISTS "crime_approvals" (
+          "id" text PRIMARY KEY DEFAULT gen_random_uuid(),
+          "crime_id" text NOT NULL REFERENCES "crime_reports"("id") ON DELETE CASCADE,
+          "admin_id" text NOT NULL REFERENCES "admins"("id") ON DELETE CASCADE,
+          "status" text NOT NULL,
+          "reviewed_at" timestamp,
+          "created_at" timestamp DEFAULT current_timestamp,
+          UNIQUE("crime_id")
+        );
+
+        CREATE TABLE IF NOT EXISTS "admin_feedback" (
+          "id" text PRIMARY KEY DEFAULT gen_random_uuid(),
+          "crime_id" text NOT NULL REFERENCES "crime_reports"("id") ON DELETE CASCADE,
+          "user_id" text NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+          "admin_id" text NOT NULL REFERENCES "admins"("id") ON DELETE CASCADE,
+          "message" text NOT NULL,
+          "is_read" integer DEFAULT 0,
+          "created_at" timestamp DEFAULT current_timestamp
+        );
+
         CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "sessions"("expire");
       `;
       
@@ -127,6 +155,34 @@ export async function initializeDatabase() {
           "longitude" real,
           "address" text,
           "sent_to" json,
+          "created_at" datetime DEFAULT current_timestamp
+        );
+
+        CREATE TABLE IF NOT EXISTS "admins" (
+          "id" text PRIMARY KEY,
+          "email" text UNIQUE NOT NULL,
+          "password_hash" text NOT NULL,
+          "full_name" text,
+          "created_at" datetime DEFAULT current_timestamp
+        );
+
+        CREATE TABLE IF NOT EXISTS "crime_approvals" (
+          "id" text PRIMARY KEY,
+          "crime_id" text NOT NULL REFERENCES "crime_reports"("id") ON DELETE CASCADE,
+          "admin_id" text NOT NULL REFERENCES "admins"("id") ON DELETE CASCADE,
+          "status" text NOT NULL,
+          "reviewed_at" datetime,
+          "created_at" datetime DEFAULT current_timestamp,
+          UNIQUE("crime_id")
+        );
+
+        CREATE TABLE IF NOT EXISTS "admin_feedback" (
+          "id" text PRIMARY KEY,
+          "crime_id" text NOT NULL REFERENCES "crime_reports"("id") ON DELETE CASCADE,
+          "user_id" text NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+          "admin_id" text NOT NULL REFERENCES "admins"("id") ON DELETE CASCADE,
+          "message" text NOT NULL,
+          "is_read" integer DEFAULT 0,
           "created_at" datetime DEFAULT current_timestamp
         );
 

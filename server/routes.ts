@@ -7,7 +7,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { sendSosMessage } from "./twilio";
 import { analyzeCrimePatterns } from "./gemini";
-import { insertEmergencyContactSchema, insertCrimeReportSchema, insertSosAlertSchema } from "@shared/schema";
+import { insertEmergencyContactSchema, insertCrimeReportSchema, insertSosAlertSchema, insertAdminFeedbackSchema } from "@shared/schema";
 import * as bcrypt from "bcryptjs";
 import { initializeDatabase } from "./initDb";
 
@@ -347,7 +347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let foundArea = false;
         
         // Check if crime falls within existing area cluster
-        for (const [areaKey, areaCrimes] of areaMap) {
+        areaMap.forEach((areaCrimes, areaKey) => {
           if (areaCrimes.length > 0) {
             const firstCrime = areaCrimes[0];
             const distance = calculateDistance(
@@ -358,10 +358,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (distance <= AREA_RADIUS_KM) {
               areaCrimes.push(crime);
               foundArea = true;
-              break;
             }
           }
-        }
+        });
         
         // If no cluster found, create new area
         if (!foundArea) {
@@ -1030,6 +1029,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[Safe Places] Error:", error);
       res.json([]);
+    }
+  });
+
+  // ============= ADMIN ROUTES =============
+  
+  // Admin login
+  app.post('/api/admin/login', async (req: any, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || !admin.passwordHash) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, admin.passwordHash);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Create admin session
+      req.user = {
+        claims: { sub: admin.id, isAdmin: true },
+        access_token: 'admin-auth',
+        refresh_token: 'admin-auth',
+        expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
+      };
+
+      req.login(req.user, (err: any) => {
+        if (err) return res.status(500).json({ message: 'Session creation failed' });
+        res.json({ success: true });
+      });
+    } catch (error: any) {
+      console.error("Admin login error:", error);
+      res.status(500).json({ message: error.message || "Login failed" });
+    }
+  });
+
+  // Admin logout
+  app.get('/api/admin/logout', (req: any, res) => {
+    req.logout((err: any) => {
+      if (err) return res.status(500).json({ message: 'Logout failed' });
+      res.redirect('/admin-login');
+    });
+  });
+
+  // Get crimes for admin review
+  app.get('/api/admin/crimes', isAuthenticated, async (req: any, res) => {
+    try {
+      const crimes = await storage.getCrimesForReview();
+      res.json(crimes);
+    } catch (error) {
+      console.error("Error fetching crimes for review:", error);
+      res.status(500).json({ message: "Failed to fetch crimes" });
+    }
+  });
+
+  // Approve a crime report
+  app.post('/api/admin/approve/:crimeId', isAuthenticated, async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const crimeId = req.params.crimeId;
+      
+      const approval = await storage.approveCrime(crimeId, adminId);
+      res.json(approval);
+    } catch (error: any) {
+      console.error("Error approving crime:", error);
+      res.status(500).json({ message: error.message || "Failed to approve crime" });
+    }
+  });
+
+  // Reject a crime report
+  app.post('/api/admin/reject/:crimeId', isAuthenticated, async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const crimeId = req.params.crimeId;
+      
+      const approval = await storage.rejectCrime(crimeId, adminId);
+      res.json(approval);
+    } catch (error: any) {
+      console.error("Error rejecting crime:", error);
+      res.status(500).json({ message: error.message || "Failed to reject crime" });
+    }
+  });
+
+  // Send feedback to user about a crime report
+  app.post('/api/admin/feedback', isAuthenticated, async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const { crimeId, message } = req.body;
+
+      if (!crimeId || !message) {
+        return res.status(400).json({ message: "Crime ID and message are required" });
+      }
+
+      // Get the crime to find the user
+      const crimes = await storage.getCrimeReports();
+      const crime = crimes.find(c => c.id === crimeId);
+      if (!crime) {
+        return res.status(404).json({ message: "Crime not found" });
+      }
+
+      const feedbackData = insertAdminFeedbackSchema.parse({
+        crimeId,
+        userId: crime.userId,
+        adminId,
+        message,
+      });
+
+      const feedback = await storage.createAdminFeedback(feedbackData);
+      res.json(feedback);
+    } catch (error: any) {
+      console.error("Error creating feedback:", error);
+      res.status(400).json({ message: error.message || "Failed to send feedback" });
+    }
+  });
+
+  // Get feedback messages for a user
+  app.get('/api/user/feedback', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const feedback = await storage.getUserFeedback(userId);
+      res.json(feedback);
+    } catch (error) {
+      console.error("Error fetching feedback:", error);
+      res.status(500).json({ message: "Failed to fetch feedback" });
     }
   });
 

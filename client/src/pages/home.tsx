@@ -7,7 +7,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, MapPin, Users, Shield, AlertCircle } from "lucide-react";
+import { AlertTriangle, MapPin, Users, Shield, AlertCircle, MessageSquare } from "lucide-react";
 import crimeDashboardImg from "@assets/generated_images/crime_dashboard_ui_concept.png";
 import protectionShieldImg from "@assets/generated_images/protection_shield_badge.png";
 import type { EmergencyContact, CrimeReport } from "@shared/schema";
@@ -65,6 +65,13 @@ export default function Home() {
     enabled: isAuthenticated,
     refetchInterval: 5000, // Poll every 5 seconds for real-time updates
     refetchIntervalInBackground: true, // Keep polling even when tab is not focused
+  });
+
+  // Fetch admin feedback messages
+  const { data: feedbackMessages = [] } = useQuery<any[]>({
+    queryKey: ["/api/user/feedback"],
+    enabled: isAuthenticated,
+    refetchInterval: 5000, // Poll for new messages
   });
 
   // SOS Alert mutation
@@ -324,6 +331,36 @@ export default function Home() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Admin Feedback Messages */}
+      {feedbackMessages.length > 0 && (
+        <Card className="border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 relative z-10">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              Messages from System Admin
+            </CardTitle>
+            <CardDescription>
+              Feedback on your crime reports
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {feedbackMessages.map((feedback: any) => (
+                <div key={feedback.id} className="bg-white dark:bg-slate-900 p-4 rounded-lg border-l-4 border-blue-500">
+                  <div className="flex items-start justify-between mb-2">
+                    <p className="font-semibold text-sm">System Admin</p>
+                    <span className="text-xs text-muted-foreground">
+                      {feedback.createdAt ? new Date(feedback.createdAt).toLocaleDateString() : ""}
+                    </span>
+                  </div>
+                  <p className="text-sm text-foreground">{feedback.message}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quick Actions */}
       <div className="grid gap-4 md:grid-cols-2 relative z-10">

@@ -125,3 +125,58 @@ export const insertSosAlertSchema = createInsertSchema(sosAlerts).omit({
 
 export type InsertSosAlert = z.infer<typeof insertSosAlertSchema>;
 export type SosAlert = typeof sosAlerts.$inferSelect;
+
+// Admin users table - Separate from regular users
+export const admins = pgTable("admins", {
+  id: varchar("id").primaryKey(),
+  email: varchar("email").unique().notNull(),
+  passwordHash: varchar("password_hash").notNull(),
+  fullName: varchar("full_name"),
+  createdAt: timestamp("created_at"),
+});
+
+export type Admin = typeof admins.$inferSelect;
+
+// Crime approval/rejection tracking
+export const crimeApprovals = pgTable("crime_approvals", {
+  id: varchar("id").primaryKey(),
+  crimeId: varchar("crime_id").notNull().references(() => crimeReports.id, { onDelete: "cascade" }),
+  adminId: varchar("admin_id").notNull().references(() => admins.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 20 }).notNull(), // "pending", "approved", "rejected"
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at"),
+});
+
+export type CrimeApproval = typeof crimeApprovals.$inferSelect;
+
+// Admin feedback/messages to users
+export const adminFeedback = pgTable("admin_feedback", {
+  id: varchar("id").primaryKey(),
+  crimeId: varchar("crime_id").notNull().references(() => crimeReports.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  adminId: varchar("admin_id").notNull().references(() => admins.id, { onDelete: "cascade" }),
+  message: text("message").notNull(),
+  isRead: integer("is_read").default(0), // 0=unread, 1=read
+  createdAt: timestamp("created_at"),
+});
+
+export const adminFeedbackRelations = relations(adminFeedback, ({ one }) => ({
+  crime: one(crimeReports, {
+    fields: [adminFeedback.crimeId],
+    references: [crimeReports.id],
+  }),
+  user: one(users, {
+    fields: [adminFeedback.userId],
+    references: [users.id],
+  }),
+}));
+
+export type AdminFeedback = typeof adminFeedback.$inferSelect;
+
+export const insertAdminFeedbackSchema = createInsertSchema(adminFeedback).omit({
+  id: true,
+  createdAt: true,
+  isRead: true,
+});
+
+export type InsertAdminFeedback = z.infer<typeof insertAdminFeedbackSchema>;
