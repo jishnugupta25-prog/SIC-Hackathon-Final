@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare } from "lucide-react";
+import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -26,6 +26,7 @@ type CrimeForReview = {
   longitude: number;
   address?: string;
   isAnonymous: number;
+  reportedAt?: string;
   createdAt?: string;
   approval?: {
     status: string;
@@ -278,8 +279,8 @@ export default function AdminPanel() {
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {crime.createdAt
-                          ? formatDistanceToNow(new Date(crime.createdAt), { addSuffix: true })
+                        {crime.reportedAt
+                          ? formatDistanceToNow(new Date(crime.reportedAt), { addSuffix: true })
                           : "Unknown"}
                       </p>
                     </div>
@@ -337,6 +338,34 @@ export default function AdminPanel() {
                     <p className="text-xs font-semibold text-muted-foreground">Exact Coordinates</p>
                     <p className="text-sm mt-1 font-mono text-xs">{selectedCrime.latitude.toFixed(6)}°, {selectedCrime.longitude.toFixed(6)}°</p>
                   </div>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
+                      <Clock className="h-3 w-3" />
+                      Submission Time
+                    </p>
+                    <div className="mt-2 bg-muted/50 p-3 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Exact Time</p>
+                      <p className="text-sm font-mono">
+                        {selectedCrime.reportedAt
+                          ? new Date(selectedCrime.reportedAt).toLocaleString("en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                              hour12: true,
+                            })
+                          : "Not available"}
+                      </p>
+                      {selectedCrime.reportedAt && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {formatDistanceToNow(new Date(selectedCrime.reportedAt), { addSuffix: true })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground">Status</p>
                     <Badge
