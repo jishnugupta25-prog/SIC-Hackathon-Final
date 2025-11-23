@@ -171,6 +171,7 @@ export default function ReportCrime() {
       latitude: 0,
       longitude: 0,
       address: "",
+      phoneNumber: "",
       isAnonymous: 0,
     },
   });
@@ -382,6 +383,28 @@ export default function ReportCrime() {
                             data-testid="input-address"
                           />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="phoneNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number *</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter your phone number (e.g., +1-555-123-4567)"
+                            {...field}
+                            value={field.value || ""}
+                            data-testid="input-phone-number"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Required for contact purposes
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}

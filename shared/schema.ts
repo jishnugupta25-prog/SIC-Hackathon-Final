@@ -76,6 +76,7 @@ export const crimeReports = pgTable("crime_reports", {
   latitude: real("latitude").notNull(),
   longitude: real("longitude").notNull(),
   address: text("address"),
+  phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
   isAnonymous: integer("is_anonymous").default(0), // 0=false, 1=true for SQLite compatibility
   reportedAt: timestamp("reported_at"),
   createdAt: timestamp("created_at"),
@@ -92,6 +93,8 @@ export const insertCrimeReportSchema = createInsertSchema(crimeReports).omit({
   id: true,
   createdAt: true,
   reportedAt: true,
+}).extend({
+  phoneNumber: z.string().min(7, "Phone number must be at least 7 digits").max(20, "Phone number is too long"),
 });
 
 export type InsertCrimeReport = z.infer<typeof insertCrimeReportSchema>;
