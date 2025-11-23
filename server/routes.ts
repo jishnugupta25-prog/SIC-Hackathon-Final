@@ -112,11 +112,29 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 // Middleware to check if user is an admin
-function isAdmin(req: any, res: any, next: any) {
-  if (!req.user || !req.user.claims || !req.user.claims.isAdmin) {
+async function isAdmin(req: any, res: any, next: any) {
+  try {
+    if (!req.user || !req.user.claims || !req.user.claims.sub) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    // Check if user ID exists in admins table (admin.id === req.user.claims.sub)
+    // When admin logs in, sub is set to admin.id
+    const db = await (await import("./db")).getDb();
+    const { admins } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    const [admin] = await db.select().from(admins).where(eq(admins.id, req.user.claims.sub));
+    if (!admin) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    // Attach admin to request for later use
+    req.admin = admin;
+    next();
+  } catch (error) {
     return res.status(403).json({ message: "Admin access required" });
   }
-  next();
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
