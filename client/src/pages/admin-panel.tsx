@@ -294,106 +294,39 @@ export default function AdminPanel() {
 
       {/* Report Details Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh]" data-testid="dialog-report-details">
+        <DialogContent className="max-w-lg max-h-[95vh] overflow-hidden flex flex-col" data-testid="dialog-report-details">
           {selectedCrime ? (
-            <ScrollArea className="h-full">
-              <div className="pr-4">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    {selectedCrime.crimeType}
-                  </DialogTitle>
-                  <DialogDescription>
-                    Report submitted {selectedCrime.reportedAt
-                      ? formatDistanceToNow(new Date(selectedCrime.reportedAt), { addSuffix: true })
-                      : "Unknown"}
-                  </DialogDescription>
-                </DialogHeader>
+            <>
+              <DialogHeader className="pb-2">
+                <DialogTitle className="text-lg flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  {selectedCrime.crimeType}
+                </DialogTitle>
+                <DialogDescription className="text-xs">
+                  {selectedCrime.reportedAt
+                    ? new Date(selectedCrime.reportedAt).toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      })
+                    : "Unknown"}
+                </DialogDescription>
+              </DialogHeader>
 
-                <div className="space-y-4 py-4">
-                  {/* Reporter Information */}
-                  {(selectedCrime as any).reporter && (
-                    <div className="bg-secondary/50 p-4 rounded-lg">
-                      <p className="text-xs font-semibold text-muted-foreground mb-3">Reporter Information</p>
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Name</p>
-                          <p className="text-sm font-semibold">{(selectedCrime as any).reporter.firstName} {(selectedCrime as any).reporter.lastName}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Email</p>
-                          <p className="text-sm">{(selectedCrime as any).reporter.email}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Crime Type */}
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground">Crime Type</p>
-                    <p className="text-sm font-semibold mt-1">{selectedCrime.crimeType}</p>
-                  </div>
-
-                  {/* Description */}
-                  {selectedCrime.description && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground">Description</p>
-                      <p className="text-sm mt-1">{selectedCrime.description}</p>
-                    </div>
-                  )}
-
-                  {/* Location */}
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground">Location Address</p>
-                    <p className="text-sm mt-1">{selectedCrime.address || "Not specified"}</p>
-                  </div>
-
-                  {/* Coordinates */}
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground">Exact Coordinates</p>
-                    <p className="text-sm mt-1 font-mono text-xs">{selectedCrime.latitude.toFixed(6)}°, {selectedCrime.longitude.toFixed(6)}°</p>
-                  </div>
-
-                  {/* Submission Time */}
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-                      <Clock className="h-3 w-3" />
-                      Submission Time
-                    </p>
-                    <div className="mt-2 bg-muted/50 p-3 rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-1">Exact Time</p>
-                      <p className="text-sm font-mono">
-                        {selectedCrime.reportedAt
-                          ? new Date(selectedCrime.reportedAt).toLocaleString("en-US", {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                              hour12: true,
-                            })
-                          : "Not available"}
-                      </p>
-                      {selectedCrime.reportedAt && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {formatDistanceToNow(new Date(selectedCrime.reportedAt), { addSuffix: true })}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Status */}
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground">Status</p>
+              <ScrollArea className="flex-1 overflow-hidden">
+                <div className="pr-4 space-y-2">
+                  {/* Quick Status & Action */}
+                  <div className="flex items-center justify-between bg-muted/50 p-2 rounded-lg">
                     <Badge
-                      className={`mt-1 ${
+                      className={
                         selectedCrime.approval?.status === "approved"
-                          ? "bg-green-500/20 text-green-700 dark:text-green-400"
+                          ? "bg-green-500/20 text-green-700 dark:text-green-400 text-xs"
                           : selectedCrime.approval?.status === "rejected"
-                          ? "bg-red-500/20 text-red-700 dark:text-red-400"
-                          : "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400"
-                      }`}
+                          ? "bg-red-500/20 text-red-700 dark:text-red-400 text-xs"
+                          : "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 text-xs"
+                      }
                     >
                       {selectedCrime.approval?.status === "approved"
                         ? "Approved"
@@ -401,67 +334,99 @@ export default function AdminPanel() {
                         ? "Rejected"
                         : "Pending"}
                     </Badge>
+                    {(!selectedCrime.approval || selectedCrime.approval.status === "pending") && (
+                      <div className="flex gap-1">
+                        <Button
+                          onClick={() => approveMutation.mutate(selectedCrime.id)}
+                          className="h-8 px-3 bg-green-600 hover:bg-green-700 text-xs"
+                          disabled={approveMutation.isPending}
+                          data-testid="button-approve"
+                        >
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Approve
+                        </Button>
+                        <Button
+                          onClick={() => rejectMutation.mutate(selectedCrime.id)}
+                          className="h-8 px-3 bg-red-600 hover:bg-red-700 text-xs"
+                          disabled={rejectMutation.isPending}
+                          data-testid="button-reject"
+                        >
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Reject
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Approve/Reject Buttons */}
-                  {(!selectedCrime.approval || selectedCrime.approval.status === "pending") && (
-                    <div className="flex gap-2 py-4">
-                      <Button
-                        onClick={() => approveMutation.mutate(selectedCrime.id)}
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                        disabled={approveMutation.isPending}
-                        data-testid="button-approve"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Approve
-                      </Button>
-                      <Button
-                        onClick={() => rejectMutation.mutate(selectedCrime.id)}
-                        variant="destructive"
-                        className="flex-1"
-                        disabled={rejectMutation.isPending}
-                        data-testid="button-reject"
-                      >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Reject
-                      </Button>
+                  {/* Reporter Info - Compact */}
+                  {(selectedCrime as any).reporter && (
+                    <div className="bg-secondary/30 p-2 rounded text-xs space-y-1">
+                      <p className="font-semibold">{(selectedCrime as any).reporter.firstName} {(selectedCrime as any).reporter.lastName}</p>
+                      <p className="text-muted-foreground break-all">{(selectedCrime as any).reporter.email}</p>
                     </div>
                   )}
 
-                  {/* Feedback Section */}
-                  <div className="border-t pt-4 mt-4">
-                    <p className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      Feedback Messages ({Array.isArray(crimeFeedback) ? crimeFeedback.length : 0})
+                  {/* Description */}
+                  {selectedCrime.description && (
+                    <div className="text-xs space-y-1">
+                      <p className="font-semibold text-muted-foreground">Description</p>
+                      <p className="text-sm">{selectedCrime.description}</p>
+                    </div>
+                  )}
+
+                  {/* Location & Coordinates */}
+                  <div className="text-xs space-y-1">
+                    <p className="font-semibold text-muted-foreground">Location</p>
+                    <p className="text-sm">{selectedCrime.address || "Not specified"}</p>
+                    <p className="font-mono text-xs text-muted-foreground">{selectedCrime.latitude.toFixed(6)}°, {selectedCrime.longitude.toFixed(6)}°</p>
+                  </div>
+
+                  {/* Submission Time - Compact */}
+                  <div className="bg-muted/50 p-2 rounded text-xs space-y-1">
+                    <p className="font-semibold flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {selectedCrime.reportedAt
+                        ? new Date(selectedCrime.reportedAt).toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                            hour12: true,
+                          })
+                        : "Not available"}
+                    </p>
+                  </div>
+
+                  {/* Feedback Section - Compact */}
+                  <div className="border-t pt-2 mt-2">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3" />
+                      Feedback ({Array.isArray(crimeFeedback) ? crimeFeedback.length : 0})
                     </p>
                     
                     {Array.isArray(crimeFeedback) && crimeFeedback.length > 0 && (
-                      <div className="space-y-2 mb-4 bg-secondary/30 p-3 rounded-lg">
+                      <div className="space-y-1 mb-2 bg-secondary/20 p-2 rounded max-h-20 overflow-y-auto">
                         {crimeFeedback.map((feedback: any) => (
-                          <div key={feedback.id} className="bg-background p-2 rounded border-l-2 border-blue-500">
-                            <div className="flex justify-between items-start mb-1">
-                              <p className="text-xs font-semibold">System Admin</p>
-                              <p className="text-xs text-muted-foreground">
-                                {feedback.createdAt ? new Date(feedback.createdAt).toLocaleDateString() : ""}
-                              </p>
-                            </div>
-                            <p className="text-sm text-foreground">{feedback.message}</p>
+                          <div key={feedback.id} className="bg-background p-1 rounded border-l-2 border-blue-500 text-xs">
+                            <p className="text-xs text-foreground">{feedback.message}</p>
                           </div>
                         ))}
                       </div>
                     )}
 
                     <Textarea
-                      placeholder="Type your feedback message..."
+                      placeholder="Add feedback..."
                       value={feedbackMessage}
                       onChange={(e) => setFeedbackMessage(e.target.value)}
-                      className="resize-none mb-2"
+                      className="resize-none mb-2 text-xs h-20"
                       data-testid="textarea-feedback"
                     />
                     <Button
                       onClick={handleSendFeedback}
                       disabled={feedbackLoading || !feedbackMessage.trim()}
-                      className="w-full"
+                      className="w-full h-8 text-xs"
                       size="sm"
                       data-testid="button-send-feedback"
                     >
@@ -469,8 +434,8 @@ export default function AdminPanel() {
                     </Button>
                   </div>
                 </div>
-              </div>
-            </ScrollArea>
+              </ScrollArea>
+            </>
           ) : null}
         </DialogContent>
       </Dialog>
