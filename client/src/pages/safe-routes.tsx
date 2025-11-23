@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertTriangle, MapPin, Route, Shield, Navigation, Zap, Locate, Search, X, MapIcon } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -666,7 +666,7 @@ export default function SafeRoutes() {
 
       {/* Route Details Modal */}
       <Dialog open={showRouteModal} onOpenChange={setShowRouteModal}>
-        <DialogContent className="max-w-lg" data-testid="dialog-route-details">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="dialog-route-details">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MapIcon className="h-5 w-5" />
@@ -681,7 +681,7 @@ export default function SafeRoutes() {
               <div
                 id="route-modal-map"
                 className="bg-muted rounded-md"
-                style={{ height: "250px" }}
+                style={{ height: "200px" }}
               />
 
               {/* Route Details */}
@@ -722,18 +722,20 @@ export default function SafeRoutes() {
                 <p className="text-xs text-muted-foreground mb-1">Recommendation</p>
                 <p className="text-sm">{selectedRoute.recommendation}</p>
               </div>
-
-              {/* Directions Button */}
-              <Button
-                onClick={handleGetDirections}
-                className="w-full"
-                data-testid="button-get-directions"
-              >
-                <MapIcon className="h-4 w-4 mr-2" />
-                Get Directions in Google Maps
-              </Button>
             </div>
           )}
+
+          {/* Directions Button in Footer */}
+          <DialogFooter className="pt-4">
+            <Button
+              onClick={handleGetDirections}
+              className="w-full"
+              data-testid="button-get-directions"
+            >
+              <MapIcon className="h-4 w-4 mr-2" />
+              Get Directions in Google Maps
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
