@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useVoiceCommands } from "@/hooks/useVoiceCommands";
-import { isUnauthorizedError } from "@/lib/authUtils";
+import { useGlobalVoiceCommands } from "@/context/VoiceCommandContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,16 +40,19 @@ export default function Home() {
     enabled: isAuthenticated,
   });
 
-  // Voice commands hook for SOS activation - always enabled
-  const { isListening, stopListening } = useVoiceCommands({
-    keywords: ["SOS", "emergency", "help", "danger", "mayday"],
-    onCommandDetected: (keyword) => {
-      console.log(`[Voice SOS] Detected: "${keyword}"`);
+  // Use global voice commands
+  const { isListening } = useGlobalVoiceCommands();
+
+  // Listen for global voice commands
+  useEffect(() => {
+    const handleVoiceCommand = (event: any) => {
+      const keyword = event.detail.keyword;
+      console.log(`[Home] Voice command detected: "${keyword}"`);
       toast({
         title: "Voice Command Detected",
         description: `Activating SOS via voice: "${keyword}"`,
       });
-      // Trigger SOS directly when voice command is detected
+      
       if (contacts.length === 0) {
         toast({
           title: "No Emergency Contacts",
@@ -59,6 +61,7 @@ export default function Home() {
         });
         return;
       }
+      
       if (location) {
         confirmSosViaVoice();
       } else {
@@ -68,23 +71,15 @@ export default function Home() {
           variant: "destructive",
         });
       }
-    },
-    onListeningStart: () => {
-      console.log('[Voice SOS] Listening started');
-    },
-    onListeningEnd: () => {
-      console.log('[Voice SOS] Listening stopped');
-    },
-    onError: (error) => {
-      console.error('[Voice SOS] Error:', error);
-      // Silently fail on error to avoid spam
-    },
-  });
+    };
 
-  // Redirect if not authenticated and stop listening
+    window.addEventListener('voiceCommandDetected', handleVoiceCommand);
+    return () => window.removeEventListener('voiceCommandDetected', handleVoiceCommand);
+  }, [contacts, location, toast]);
+
+  // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      stopListening();
       toast({
         title: "Unauthorized",
         description: "You are logged out. Logging in again...",
@@ -94,7 +89,7 @@ export default function Home() {
         window.location.href = "/api/login";
       }, 500);
     }
-  }, [isAuthenticated, authLoading, toast, stopListening]);
+  }, [isAuthenticated, authLoading, toast]);
 
   // Calculate safety score based on crime count
   const calculateSafetyScore = (crimeCount: number) => {
