@@ -64,34 +64,85 @@ export default function CrimeMap() {
       return;
     }
 
+    let watchId: number | null = null;
+    let bestAccuracy = Infinity;
+    let bestPosition: { latitude: number; longitude: number } | null = null;
+    let timeoutId: NodeJS.Timeout;
+
     const options = {
-      enableHighAccuracy: true, // Enable high accuracy for ±2-3 meters precision
-      timeout: 120000, // 120 seconds for satellite lock
-      maximumAge: 30000, // Allow cached results up to 30 seconds old for faster responses
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
     };
 
-    console.log("Requesting crime map location...");
+    console.log("[Crime Map GPS] Requesting location with improved accuracy...");
 
-    navigator.geolocation.getCurrentPosition(
+    // Watch for location updates
+    watchId = navigator.geolocation.watchPosition(
       (position) => {
+        const accuracy = position.coords.accuracy;
         const newLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         };
-        console.log("Crime map location obtained:", newLocation);
-        setLocation(newLocation);
+
+        console.log(`[Crime Map GPS] Reading: ±${Math.round(accuracy)}m accuracy`);
+
+        // Keep track of the best reading
+        if (accuracy < bestAccuracy) {
+          bestAccuracy = accuracy;
+          bestPosition = newLocation;
+          console.log(`[Crime Map GPS] ✓ Better accuracy found: ±${Math.round(accuracy)}m`);
+        }
+
+        // Accept reading if accuracy is good (< 100m)
+        if (accuracy < 100) {
+          console.log(`[Crime Map GPS] ✓ Excellent accuracy achieved: ±${Math.round(accuracy)}m`);
+          setLocation(newLocation);
+          if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+          }
+          clearTimeout(timeoutId);
+        }
       },
       (error) => {
-        console.error(
-          "Geolocation error for crime map:",
-          error.code,
-          error.message,
-        );
-        console.log("Using fallback location for crime map");
-        setLocation(fallbackLocation);
+        console.error("[Crime Map GPS] Error:", error.code, error.message);
+        // Use best position found so far or fallback
+        if (bestPosition) {
+          console.log(`[Crime Map GPS] Using best reading found: ±${Math.round(bestAccuracy)}m`);
+          setLocation(bestPosition);
+        } else {
+          console.log("[Crime Map GPS] Using fallback location");
+          setLocation(fallbackLocation);
+        }
       },
       options,
     );
+
+    // Timeout after 30 seconds - use best reading found
+    timeoutId = setTimeout(() => {
+      console.log("[Crime Map GPS] Timeout reached");
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      if (bestPosition) {
+        console.log(`[Crime Map GPS] Using best reading found: ±${Math.round(bestAccuracy)}m`);
+        setLocation(bestPosition);
+      } else {
+        console.log("[Crime Map GPS] Using fallback location");
+        setLocation(fallbackLocation);
+      }
+    }, 30000);
+
+    // Cleanup on unmount
+    return () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   useEffect(() => {

@@ -160,55 +160,91 @@ export default function SafePlaces() {
   const requestLocationFn = () => {
     const options = {
       enableHighAccuracy: true,
-      timeout: 120000, // 120 seconds for satellite lock
-      maximumAge: 30000, // Allow cached results up to 30 seconds old for faster responses
+      timeout: 10000,
+      maximumAge: 0,
     };
 
     setLocationStatus("loading");
-    const timeout = setTimeout(() => {
-      setLocationStatus("disabled");
-      setLocationErrorMessage("Location request timed out. Please try again.");
-      setShowLocationAlert(true);
-    }, 65000); // 65 seconds (timeout + buffer)
+    let watchId: number | null = null;
+    let bestAccuracy = Infinity;
+    let bestPosition: { latitude: number; longitude: number; accuracy: number } | null = null;
+
+    const timeoutId = setTimeout(() => {
+      console.log("[GPS Safe Places] Timeout reached");
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      if (bestPosition) {
+        console.log(`[GPS Safe Places] Using best reading: ±${Math.round(bestPosition.accuracy)}m`);
+        setCurrentLocation(bestPosition);
+        setDisplayLocation(bestPosition);
+        setLocation({
+          latitude: bestPosition.latitude,
+          longitude: bestPosition.longitude,
+          name: "Current Location",
+        });
+      } else {
+        setLocationStatus("disabled");
+        setLocationErrorMessage("Location request timed out. Please try again.");
+        setShowLocationAlert(true);
+      }
+      setLocationStatus("active");
+    }, 30000); // 30 seconds total
     
-    navigator.geolocation.getCurrentPosition(
+    console.log("[GPS Safe Places] Watching for location updates...");
+    watchId = navigator.geolocation.watchPosition(
       async (position) => {
-        clearTimeout(timeout);
-        
         const accuracy = Math.round(position.coords.accuracy);
-        if (accuracy > 50000) {
-          console.warn(`[GPS] Ignoring reading with poor accuracy: ±${accuracy}m`);
-          setLocationStatus("active");
-          return;
+        
+        console.log(`[GPS Safe Places] Reading: ±${accuracy}m accuracy`);
+
+        // Keep track of the best reading
+        if (accuracy < bestAccuracy) {
+          bestAccuracy = accuracy;
+          bestPosition = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: accuracy,
+          };
+          console.log(`[GPS Safe Places] ✓ Better accuracy found: ±${accuracy}m`);
         }
         
-        const currentLoc = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: accuracy,
-        };
-        console.log("[GPS] ✓ Current location acquired:", {
-          lat: currentLoc.latitude.toFixed(6),
-          lon: currentLoc.longitude.toFixed(6),
-          accuracy: `±${currentLoc.accuracy}m`
-        });
-        
-        lastLocationRef.current = { latitude: currentLoc.latitude, longitude: currentLoc.longitude };
-        
-        const { name: placeName, hierarchy, locationDetails } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
-        
-        setCurrentLocation({ ...currentLoc, placeName, hierarchy, locationDetails });
-        setDisplayLocation({ ...currentLoc, placeName, hierarchy, locationDetails });
-        setLocation({
-          latitude: currentLoc.latitude,
-          longitude: currentLoc.longitude,
-          name: placeName,
-        });
-        setLocationStatus("active");
+        // Accept reading if accuracy is good (< 100m)
+        if (accuracy < 100) {
+          console.log(`[GPS Safe Places] ✓ Excellent accuracy achieved: ±${accuracy}m`);
+          
+          const currentLoc = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: accuracy,
+          };
+          
+          lastLocationRef.current = { latitude: currentLoc.latitude, longitude: currentLoc.longitude };
+          
+          const { name: placeName, hierarchy, locationDetails } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
+          
+          setCurrentLocation({ ...currentLoc, placeName, hierarchy, locationDetails });
+          setDisplayLocation({ ...currentLoc, placeName, hierarchy, locationDetails });
+          setLocation({
+            latitude: currentLoc.latitude,
+            longitude: currentLoc.longitude,
+            name: placeName,
+          });
+          
+          if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+          }
+          clearTimeout(timeoutId);
+          setLocationStatus("active");
+        }
       },
       (error) => {
-        clearTimeout(timeout);
-        console.error("[GPS] Error:", error.code, error.message);
+        console.error("[GPS Safe Places] Error:", error.code, error.message);
+        clearTimeout(timeoutId);
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
+        }
         let errorMsg = "Unable to get your location";
         let errorStatus: "disabled" | "denied" = "disabled";
 
