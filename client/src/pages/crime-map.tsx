@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Map, AlertTriangle, Calendar, MapPin, Brain } from "lucide-react";
 import type { CrimeReport } from "@shared/schema";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 export default function CrimeMap() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
@@ -145,141 +147,171 @@ export default function CrimeMap() {
     };
   }, []);
 
+  // Crime color mapping
+  const crimeColors: Record<string, string> = {
+    Theft: "#f97316",
+    Burglary: "#d946ef",
+    Assault: "#ef4444",
+    Robbery: "#0ea5e9",
+    Vandalism: "#eab308",
+    "Vehicle Theft": "#10b981",
+    Fraud: "#f59e0b",
+    Harassment: "#ec4899",
+    "Sexual Assault": "#dc2626",
+    Rape: "#7c2d12",
+    Murder: "#1e1b4b",
+    Kidnapping: "#6366f1",
+    Stalking: "#8b5cf6",
+    "Drug Trafficking": "#14b8a6",
+    "Human Trafficking": "#f43f5e",
+    Arson: "#ea580c",
+    Cybercrime: "#06b6d4",
+    "Money Laundering": "#a16207",
+    "Animal Cruelty": "#d97706",
+    "Animal Abuse": "#ca8a04",
+    "Domestic Violence": "#be123c",
+    "Child Abuse": "#be185d",
+    Pickpocketing: "#7dd3fc",
+    Mugging: "#fca5a5",
+    Blackmail: "#fed7aa",
+    Extortion: "#fbbf24",
+    Trespassing: "#86efac",
+    "Drunk Driving": "#a78bfa",
+    "Hit and Run": "#fda4af",
+    Other: "#6b7280",
+  };
+
   useEffect(() => {
     const container = document.getElementById("crime-map-container");
     if (!container || !location) return;
 
-    // Calculate positions with collision avoidance
-    const crimeColors: Record<string, string> = {
-      Theft: "#f97316",
-      Burglary: "#d946ef",
-      Assault: "#ef4444",
-      Robbery: "#0ea5e9",
-      Vandalism: "#eab308",
-      "Vehicle Theft": "#10b981",
-      Fraud: "#f59e0b",
-      Harassment: "#ec4899",
-      "Sexual Assault": "#dc2626",
-      Rape: "#7c2d12",
-      Murder: "#1e1b4b",
-      Kidnapping: "#6366f1",
-      Stalking: "#8b5cf6",
-      "Drug Trafficking": "#14b8a6",
-      "Human Trafficking": "#f43f5e",
-      Arson: "#ea580c",
-      Cybercrime: "#06b6d4",
-      "Money Laundering": "#a16207",
-      "Animal Cruelty": "#d97706",
-      "Animal Abuse": "#ca8a04",
-      "Domestic Violence": "#be123c",
-      "Child Abuse": "#be185d",
-      Pickpocketing: "#7dd3fc",
-      Mugging: "#fca5a5",
-      Blackmail: "#fed7aa",
-      Extortion: "#fbbf24",
-      Trespassing: "#86efac",
-      "Drunk Driving": "#a78bfa",
-      "Hit and Run": "#fda4af",
-      Other: "#6b7280",
-    };
+    // Clear any existing map instance
+    const existingLeafletId = (container as any)._leaflet_id;
+    if (existingLeafletId) {
+      delete (container as any)._leaflet_id;
+    }
+    container.innerHTML = ""; // Clear previous map content
 
-    const positions: Array<{ x: number; y: number; crime: CrimeReport; idx: number }> = [];
+    // Initialize Leaflet map
+    const leafletMap = L.map(container).setView(
+      [location.latitude, location.longitude],
+      12
+    );
 
-    crimes.forEach((crime, idx) => {
-      const offsetLat = (crime.latitude - location.latitude) * 1000;
-      const offsetLon = (crime.longitude - location.longitude) * 1000;
-      let x = 50 + (offsetLon / 1000) * 25;
-      let y = 50 - (offsetLat / 1000) * 25;
+    // Add OpenStreetMap tile layer (real street map)
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution:
+        '© OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(leafletMap);
 
-      // Collision avoidance: spread out nearby crimes
-      let collisionFound = true;
-      let attempt = 0;
-      while (collisionFound && attempt < 8) {
-        collisionFound = false;
-        for (let j = 0; j < positions.length; j++) {
-          const otherPos = positions[j];
-          const dist = Math.sqrt(
-            Math.pow(x - otherPos.x, 2) + Math.pow(y - otherPos.y, 2),
-          );
-          if (dist < 8) {
-            collisionFound = true;
-            const angle = Math.atan2(y - otherPos.y, x - otherPos.x);
-            x += Math.cos(angle) * 3;
-            y += Math.sin(angle) * 3;
-            break;
-          }
-        }
-        attempt++;
+    // Add user location marker
+    (L.circleMarker as any)([location.latitude, location.longitude], {
+      radius: 8,
+      fillColor: "#3b82f6",
+      color: "#1e40af",
+      weight: 3,
+      opacity: 1,
+      fillOpacity: 0.8,
+    })
+      .bindPopup("Your Location")
+      .addTo(leafletMap);
+
+    // Add circles for sensitive areas (high crime density zones)
+    const crimeHotspots = new Map<string, { lat: number; lon: number; count: number }>();
+    
+    crimes.forEach((crime) => {
+      const key = `${Math.round(crime.latitude * 100)},${Math.round(crime.longitude * 100)}`;
+      if (crimeHotspots.has(key)) {
+        const spot = crimeHotspots.get(key)!;
+        spot.count++;
+      } else {
+        crimeHotspots.set(key, {
+          lat: crime.latitude,
+          lon: crime.longitude,
+          count: 1,
+        });
       }
-
-      positions.push({ x: Math.max(8, Math.min(92, x)), y: Math.max(8, Math.min(92, y)), crime, idx });
     });
 
-    const color = (type: string) => crimeColors[type] || "#6b7280";
+    // Draw sensitive areas as circles based on crime concentration
+    crimeHotspots.forEach((hotspot: { lat: number; lon: number; count: number }) => {
+      const intensity = Math.min(hotspot.count / 5, 1); // Max intensity at 5+ crimes
+      const radius = 300 + intensity * 1200; // 300m to 1500m radius
+      const opacity = 0.2 + intensity * 0.3; // 0.2 to 0.5 opacity
 
-    // Generate legend items from all available crime types
-    const legendItems = Object.entries(crimeColors).map(([type, color]) => ({
-      type,
-      color,
-    }));
+      L.circle([hotspot.lat, hotspot.lon], {
+        radius: radius,
+        color: "#ef4444",
+        weight: 2,
+        opacity: opacity,
+        fillColor: "#ef4444",
+        fillOpacity: opacity * 0.5,
+      })
+        .bindPopup(
+          `<strong>Sensitive Area</strong><br/>Crime incidents: ${hotspot.count}`
+        )
+        .addTo(leafletMap);
+    });
 
-    const html = `
-      <div style="position: relative; width: 100%; height: 100%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-        <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #e8f4f8 0%, #d4e6eb 100%);"></div>
-        <div style="position: absolute; width: 24px; height: 24px; background: #3b82f6; border: 4px solid #1e40af; border-radius: 50%; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 10; box-shadow: 0 0 0 10px rgba(59, 130, 246, 0.15);"></div>
-        ${positions.map((pos) => {
-          const bgColor = color(pos.crime.crimeType);
-          const googleMapsUrl = `https://www.google.com/maps?q=${pos.crime.latitude},${pos.crime.longitude}`;
-          return `
-            <div style="position: absolute; left: ${pos.x}%; top: ${pos.y}%; z-index: 5; transform: translate(-50%, -50%);" class="crime-marker" data-lat="${pos.crime.latitude}" data-lon="${pos.crime.longitude}" data-url="${googleMapsUrl}">
-              <div style="position: relative; width: 28px; height: 28px; cursor: pointer; transition: all 0.3s ease;">
-                <div style="position: absolute; width: 28px; height: 28px; background: ${bgColor}; border: 3px solid ${bgColor}; border-radius: 50%; box-shadow: 0 0 0 3px white, 0 2px 8px rgba(0,0,0,0.2); transition: all 0.3s; cursor: pointer;" onmouseover="this.style.transform='scale(1.4)'; this.style.zIndex='20'; this.style.boxShadow='0 0 0 3px white, 0 4px 12px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 0 0 3px white, 0 2px 8px rgba(0,0,0,0.2)';"></div>
-                <div style="position: absolute; width: 24px; height: 24px; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: white; z-index: 6; pointer-events: none;">${pos.idx + 1}</div>
-                <div style="position: absolute; top: -30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: white; padding: 4px 8px; border-radius: 4px; white-space: nowrap; font-size: 11px; font-weight: 500; pointer-events: none; opacity: 0; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0'">${pos.crime.crimeType}</div>
-              </div>
-            </div>
-          `;
-        }).join('')}
-        <button id="legend-toggle" style="position: absolute; top: 12px; left: 12px; background: white; border: 1px solid #ddd; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 12px; color: #333; box-shadow: 0 2px 6px rgba(0,0,0,0.12); z-index: 15; transition: all 0.2s; height: fit-content;">▼ Legend</button>
-        <div id="legend-content" style="position: absolute; top: 44px; left: 12px; background: white; padding: 10px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 15; border: 1px solid #ddd; display: none; width: 200px; max-height: 400px; overflow-y: auto;">
-          ${legendItems.map((item) => `
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; color: #555; padding: 3px 0;">
-              <div style="width: 14px; height: 14px; background-color: ${item.color}; border: 2px solid ${item.color}; border-radius: 50%; flex-shrink: 0;"></div>
-              <span style="word-break: break-word;">${item.type}</span>
-            </div>
-          `).join('')}
-        </div>
-        <div style="position: absolute; bottom: 8px; right: 8px; background: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; color: #666; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">© OpenStreetMap</div>
-      </div>
-    `;
-    
-    container.innerHTML = html;
-    
-    // Attach legend toggle functionality and crime marker click handlers after DOM is rendered
-    setTimeout(() => {
-      const toggleBtn = document.getElementById("legend-toggle");
-      const legendContent = document.getElementById("legend-content");
-      if (toggleBtn && legendContent) {
-        toggleBtn.addEventListener("click", function () {
-          const isHidden = legendContent.style.display === "none";
-          legendContent.style.display = isHidden ? "block" : "none";
-          toggleBtn.textContent = isHidden ? "▲" : "▼";
-        });
-      }
-
-      // Add click handlers to crime markers
-      const markers = document.querySelectorAll(".crime-marker");
-      markers.forEach((marker) => {
-        marker.addEventListener("click", function (e: Event) {
-          e.stopPropagation();
-          const target = e.currentTarget as HTMLElement;
-          const googleMapsUrl = target.getAttribute("data-url");
-          if (googleMapsUrl && confirm("Open Google Maps at this crime location?")) {
-            window.open(googleMapsUrl, "_blank");
-          }
-        });
+    // Add crime report markers
+    crimes.forEach((crime, idx) => {
+      const markerColor = crimeColors[crime.crimeType] || "#6b7280";
+      
+      const customIcon = L.divIcon({
+        html: `
+          <div style="
+            width: 32px;
+            height: 32px;
+            background-color: ${markerColor};
+            border: 3px solid white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            cursor: pointer;
+          ">${idx + 1}</div>
+        `,
+        iconSize: [32, 32],
+        className: "crime-marker-icon",
       });
-    }, 0);
+
+      const marker = L.marker([crime.latitude, crime.longitude], {
+        icon: customIcon,
+      });
+
+      const popupContent = `
+        <div style="font-size: 12px;">
+          <strong>${crime.crimeType}</strong><br/>
+          ${crime.address ? `Location: ${crime.address}<br/>` : ''}
+          ${crime.description ? `Details: ${crime.description.substring(0, 50)}...<br/>` : ''}
+          Reported: ${new Date(crime.reportedAt || '').toLocaleDateString()}
+        </div>
+      `;
+
+      marker.bindPopup(popupContent).addTo(leafletMap);
+    });
+
+    // Fit map bounds to show all markers
+    if (crimes.length > 0) {
+      const group = new (L.FeatureGroup as any)([]);
+      crimes.forEach((crime) => {
+        group.addLayer(
+          L.marker([crime.latitude, crime.longitude])
+        );
+      });
+      group.addLayer(L.marker([location.latitude, location.longitude]));
+      leafletMap.fitBounds(group.getBounds().pad(0.1));
+    }
+
+    // Cleanup on unmount
+    return () => {
+      leafletMap.remove();
+    };
   }, [location, crimes]);
 
   const getCrimeTypeColor = (type: string) => {
