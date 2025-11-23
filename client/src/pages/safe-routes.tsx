@@ -46,6 +46,7 @@ export default function SafeRoutes() {
   const [showEndSuggestions, setShowEndSuggestions] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const endSuggestionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -164,13 +165,14 @@ export default function SafeRoutes() {
 
     if (query.length < 2) {
       setStartSuggestions([]);
+      setShowStartSuggestions(false);
       return;
     }
 
     searchTimeoutRef.current = setTimeout(async () => {
       const suggestions = await searchLocations(query);
       setStartSuggestions(suggestions);
-      setShowStartSuggestions(true);
+      setShowStartSuggestions(suggestions.length > 0);
     }, 300);
   };
 
@@ -184,13 +186,14 @@ export default function SafeRoutes() {
 
     if (query.length < 2) {
       setEndSuggestions([]);
+      setShowEndSuggestions(false);
       return;
     }
 
     searchTimeoutRef.current = setTimeout(async () => {
       const suggestions = await searchLocations(query);
       setEndSuggestions(suggestions);
-      setShowEndSuggestions(true);
+      setShowEndSuggestions(suggestions.length > 0);
     }, 300);
   };
 
@@ -276,21 +279,35 @@ export default function SafeRoutes() {
 
     setIsLoading(true);
     try {
+      console.log("Sending route suggestion request:", {
+        startLocation,
+        endLocation,
+        startCoords,
+        endCoords,
+      });
+
       const response = await fetch("/api/suggest-safer-routes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          startLocation: startLocation,
-          endLocation: endLocation,
+          startLocation,
+          endLocation,
           userLocation: startCoords,
+          startCoords,
+          endCoords,
         }),
       });
 
+      console.log("Response status:", response.status);
+      const responseText = await response.text();
+      console.log("Response text:", responseText);
+
       if (!response.ok) {
-        throw new Error("Failed to fetch routes");
+        throw new Error(`HTTP ${response.status}: ${responseText}`);
       }
 
-      const data = await response.json();
+      const data = JSON.parse(responseText);
+      console.log("Parsed data:", data);
       setRoutes(data.routes || []);
       
       if (data.routes.length === 0) {
@@ -421,14 +438,14 @@ export default function SafeRoutes() {
               {/* Start Location Section */}
               <div className="space-y-3">
                 <label className="text-sm font-medium">Start Location</label>
-                <div className="relative">
+                <div className="relative z-40">
                   <div className="flex gap-2">
                     <div className="flex-1 relative">
                       <Input
                         placeholder="Search start location..."
                         value={startLocation}
                         onChange={(e) => handleStartLocationSearch(e.target.value)}
-                        onFocus={() => setShowStartSuggestions(true)}
+                        onFocus={() => startSuggestions.length > 0 && setShowStartSuggestions(true)}
                         data-testid="input-start-location"
                         className="pr-8"
                       />
@@ -496,12 +513,12 @@ export default function SafeRoutes() {
               {/* End Location Section */}
               <div className="space-y-2 border-t pt-4">
                 <label className="text-sm font-medium">End Location</label>
-                <div className="relative">
+                <div className="relative z-30">
                   <Input
                     placeholder="Search destination..."
                     value={endLocation}
                     onChange={(e) => handleEndLocationSearch(e.target.value)}
-                    onFocus={() => setShowEndSuggestions(true)}
+                    onFocus={() => endSuggestions.length > 0 && setShowEndSuggestions(true)}
                     data-testid="input-end-location"
                     className="pr-8"
                   />
@@ -517,24 +534,27 @@ export default function SafeRoutes() {
                       <X className="h-4 w-4" />
                     </button>
                   )}
-                </div>
 
-                {/* End Location Suggestions Dropdown */}
-                {showEndSuggestions && endSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                    {endSuggestions.map((suggestion, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => selectEndLocation(suggestion)}
-                        className="w-full text-left px-4 py-2 hover:bg-muted transition-colors border-b last:border-b-0"
-                        data-testid={`suggestion-end-${idx}`}
-                      >
-                        <p className="text-sm font-medium">{suggestion.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{suggestion.displayName}</p>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                  {/* End Location Suggestions Dropdown */}
+                  {showEndSuggestions && endSuggestions.length > 0 && (
+                    <div 
+                      ref={endSuggestionsRef}
+                      className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto"
+                    >
+                      {endSuggestions.map((suggestion, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => selectEndLocation(suggestion)}
+                          className="w-full text-left px-4 py-2 hover:bg-muted transition-colors border-b last:border-b-0"
+                          data-testid={`suggestion-end-${idx}`}
+                        >
+                          <p className="text-sm font-medium">{suggestion.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{suggestion.displayName}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Suggest Routes Button */}

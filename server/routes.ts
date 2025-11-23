@@ -1489,29 +1489,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Safe Routes API - Suggest safer alternative routes avoiding crime hotspots
   app.post('/api/suggest-safer-routes', isAuthenticated, async (req: any, res) => {
+    res.setHeader('Content-Type', 'application/json');
     try {
+      console.log("[Safe Routes API] Request received:", req.body);
       const { startLocation, endLocation, userLocation } = req.body;
 
       if (!startLocation || !endLocation) {
+        console.log("[Safe Routes API] Missing locations");
         return res.status(400).json({ message: "Start and end locations are required" });
       }
 
       // Get all crimes to analyze hotspots
-      const crimes = await getAllCrimesForRoutes();
+      let crimes: any[] = [];
+      try {
+        crimes = await getAllCrimesForRoutes();
+        console.log(`[Safe Routes API] Retrieved ${crimes.length} crimes`);
+      } catch (dbError) {
+        console.error("[Safe Routes API] Database error:", dbError);
+      }
 
-      // Parse location coordinates (for demo, using simple parsing)
-      // In production, would use geocoding service
-      const startCoords = { lat: userLocation?.latitude || 22.7700, lon: userLocation?.longitude || 88.3786 };
-      const endCoords = { lat: userLocation?.latitude + 0.05 || 22.82, lon: userLocation?.longitude + 0.05 || 88.42 };
+      // Parse location coordinates
+      const startCoords = { 
+        lat: userLocation?.latitude || 22.7700, 
+        lon: userLocation?.longitude || 88.3786 
+      };
+      const endCoords = { 
+        lat: (userLocation?.latitude || 22.7700) + 0.05, 
+        lon: (userLocation?.longitude || 88.3786) + 0.05 
+      };
+
+      console.log("[Safe Routes API] Start:", startCoords, "End:", endCoords);
 
       // Calculate crime density in grid cells
-      const gridSize = 0.01; // ~1km grid cells
+      const gridSize = 0.01;
       const crimeGrid: Record<string, number> = {};
 
-      crimes.forEach((crime) => {
-        const gridKey = `${Math.floor(crime.latitude / gridSize)},${Math.floor(crime.longitude / gridSize)}`;
-        crimeGrid[gridKey] = (crimeGrid[gridKey] || 0) + 1;
-      });
+      if (crimes && Array.isArray(crimes)) {
+        crimes.forEach((crime: any) => {
+          if (crime.latitude && crime.longitude) {
+            const gridKey = `${Math.floor(crime.latitude / gridSize)},${Math.floor(crime.longitude / gridSize)}`;
+            crimeGrid[gridKey] = (crimeGrid[gridKey] || 0) + 1;
+          }
+        });
+      }
 
       // Generate 3 alternative routes with different characteristics
       const routes = [
@@ -1550,10 +1570,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       ];
 
-      res.json({ routes, analysis: `Analyzed ${crimes.length} crime reports to suggest safer routes` });
+      console.log("[Safe Routes API] Returning", routes.length, "routes");
+      return res.json({ 
+        routes, 
+        analysis: `Analyzed ${crimes.length} crime reports to suggest safer routes` 
+      });
     } catch (error: any) {
-      console.error("Error suggesting safer routes:", error);
-      res.status(500).json({ message: error.message || "Failed to suggest safer routes" });
+      console.error("[Safe Routes API] Error:", error);
+      return res.status(500).json({ 
+        message: error.message || "Failed to suggest safer routes",
+        error: error.toString()
+      });
     }
   });
 
