@@ -41,7 +41,12 @@ export default function Home() {
   });
 
   // Use global voice commands
-  const { isListening } = useGlobalVoiceCommands();
+  const { isListening, setEmergencyContacts } = useGlobalVoiceCommands();
+
+  // Update global voice commands with emergency contacts
+  useEffect(() => {
+    setEmergencyContacts(contacts);
+  }, [contacts, setEmergencyContacts]);
 
   // Listen for global voice commands
   useEffect(() => {

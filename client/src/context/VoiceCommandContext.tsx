@@ -1,12 +1,15 @@
-import { createContext, useContext, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
 
 interface VoiceCommandContextType {
   isListening: boolean;
+  setEmergencyContacts: (contacts: any[]) => void;
 }
 
-const VoiceCommandContext = createContext<VoiceCommandContextType>({ isListening: false });
+const VoiceCommandContext = createContext<VoiceCommandContextType>({ 
+  isListening: false,
+  setEmergencyContacts: () => {}
+});
 
 export function useGlobalVoiceCommands() {
   return useContext(VoiceCommandContext);
@@ -48,17 +51,43 @@ function levenshteinDistance(str1: string, str2: string): number {
 let globalRecognition: any = null;
 let shouldKeepListening = false;
 let isCurrentlyListening = false;
+let emergencyContactsRef: any[] = [];
 
 export function VoiceCommandProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { toast } = useToast();
+  const [isListening, setIsListening] = useState(false);
+  const [emergencyContacts, setEmergencyContactsState] = useState<any[]>([]);
   const listenerRef = useRef<((isListening: boolean) => void) | null>(null);
+
+  // Update emergency contacts
+  const setEmergencyContacts = (contacts: any[]) => {
+    emergencyContactsRef = contacts;
+    setEmergencyContactsState(contacts);
+    console.log(`[Global Voice] Emergency contacts updated: ${contacts.length} contact${contacts.length !== 1 ? 's' : ''}`);
+  };
 
   useEffect(() => {
     // Only initialize when authenticated
     if (!isAuthenticated || authLoading) {
       shouldKeepListening = false;
       isCurrentlyListening = false;
+      setIsListening(false);
+      if (globalRecognition) {
+        try {
+          globalRecognition.stop();
+        } catch (e) {
+          // Ignore
+        }
+      }
+      return;
+    }
+
+    // Don't activate if no emergency contacts
+    if (emergencyContacts.length === 0) {
+      console.log('[Global Voice] No emergency contacts - voice commands disabled');
+      shouldKeepListening = false;
+      isCurrentlyListening = false;
+      setIsListening(false);
       if (globalRecognition) {
         try {
           globalRecognition.stop();
@@ -88,6 +117,7 @@ export function VoiceCommandProvider({ children }: { children: ReactNode }) {
 
       globalRecognition.onstart = () => {
         isCurrentlyListening = true;
+        setIsListening(true);
         if (listenerRef.current) listenerRef.current(true);
         console.log('[Global Voice] Listening started');
       };
@@ -141,12 +171,13 @@ export function VoiceCommandProvider({ children }: { children: ReactNode }) {
 
       globalRecognition.onend = () => {
         isCurrentlyListening = false;
+        setIsListening(false);
         if (listenerRef.current) listenerRef.current(false);
         console.log('[Global Voice] Listening stopped, auto-restarting...');
         
-        if (shouldKeepListening && globalRecognition) {
+        if (shouldKeepListening && globalRecognition && emergencyContactsRef.length > 0) {
           setTimeout(() => {
-            if (shouldKeepListening && globalRecognition) {
+            if (shouldKeepListening && globalRecognition && emergencyContactsRef.length > 0) {
               try {
                 console.log('[Global Voice] Restarting...');
                 globalRecognition.start();
@@ -159,7 +190,7 @@ export function VoiceCommandProvider({ children }: { children: ReactNode }) {
       };
     }
 
-    // Start listening
+    // Start listening only if we have emergency contacts
     try {
       globalRecognition.start();
     } catch (e) {
@@ -169,10 +200,10 @@ export function VoiceCommandProvider({ children }: { children: ReactNode }) {
     return () => {
       // Don't stop on unmount - keep listening
     };
-  }, [isAuthenticated, authLoading]);
+  }, [isAuthenticated, authLoading, emergencyContacts.length]);
 
   return (
-    <VoiceCommandContext.Provider value={{ isListening: isCurrentlyListening }}>
+    <VoiceCommandContext.Provider value={{ isListening, setEmergencyContacts }}>
       {children}
     </VoiceCommandContext.Provider>
   );
