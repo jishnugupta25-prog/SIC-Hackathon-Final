@@ -8,7 +8,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, MapPin, Users, Shield, AlertCircle, MessageSquare } from "lucide-react";
+import { AlertTriangle, MapPin, Users, Shield, AlertCircle, MessageSquare, AlertOctagon } from "lucide-react";
 import crimeDashboardImg from "@assets/generated_images/crime_dashboard_ui_concept.png";
 import protectionShieldImg from "@assets/generated_images/protection_shield_badge.png";
 import type { EmergencyContact, CrimeReport } from "@shared/schema";
@@ -31,6 +31,8 @@ export default function Home() {
   const [sosCounter, setSosCounter] = useState(0);
   const [showSosConfirm, setShowSosConfirm] = useState(false);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [dangerZoneAlert, setDangerZoneAlert] = useState<{ message: string; crimeCount: number } | null>(null);
+  const [alertShown, setAlertShown] = useState<string>("");  // Track which hotspots we've alerted about
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -59,6 +61,65 @@ export default function Home() {
     if (crimeCount <= 15) return { label: "Good", color: "text-chart-4" };
     if (crimeCount <= 30) return { label: "Fair", color: "text-chart-2" };
     return { label: "Poor", color: "text-destructive" };
+  };
+
+  // Calculate distance between two coordinates (in kilometers)
+  const calculateDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ): number => {
+    const R = 6371; // Earth's radius in km
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Detect crime hotspots (clusters of crimes)
+  const detectCrimeHotspots = () => {
+    if (recentCrimes.length < 2) return [];
+
+    // Group crimes within 0.5km radius into hotspots
+    const hotspots: Array<{ lat: number; lon: number; crimes: CrimeReport[] }> = [];
+    const processed = new Set<string>();
+
+    recentCrimes.forEach((crime) => {
+      const crimeId = crime.id;
+      if (processed.has(crimeId)) return;
+
+      const nearby = recentCrimes.filter(
+        (other) =>
+          !processed.has(other.id) &&
+          calculateDistance(crime.latitude, crime.longitude, other.latitude, other.longitude) <
+            0.5
+      );
+
+      if (nearby.length > 0) {
+        // Calculate centroid of crimes
+        const avgLat =
+          nearby.reduce((sum, c) => sum + c.latitude, 0) / nearby.length;
+        const avgLon =
+          nearby.reduce((sum, c) => sum + c.longitude, 0) / nearby.length;
+
+        hotspots.push({
+          lat: avgLat,
+          lon: avgLon,
+          crimes: nearby,
+        });
+
+        nearby.forEach((c) => processed.add(c.id));
+      }
+    });
+
+    return hotspots;
   };
 
   // Fetch recent crime reports with polling for real-time updates
@@ -169,6 +230,49 @@ export default function Home() {
       clearTimeout(timeoutId);
     };
   }, []);
+
+  // Monitor for entry into high-crime areas (predictive safety alerts)
+  useEffect(() => {
+    if (!location || recentCrimes.length === 0) {
+      setDangerZoneAlert(null);
+      return;
+    }
+
+    const hotspots = detectCrimeHotspots();
+    
+    // Check if user is in a danger zone (within 1km of a high-crime hotspot)
+    const dangerZone = hotspots.find((hotspot) => {
+      const distance = calculateDistance(
+        location.latitude,
+        location.longitude,
+        hotspot.lat,
+        hotspot.lon
+      );
+      return distance < 1 && hotspot.crimes.length >= 3; // High-crime area has 3+ crimes
+    });
+
+    if (dangerZone) {
+      const hotspotId = `${dangerZone.lat}-${dangerZone.lon}`;
+      
+      // Only show alert if we haven't shown it for this hotspot recently
+      if (alertShown !== hotspotId) {
+        setDangerZoneAlert({
+          message: `⚠️ High-crime area detected! ${dangerZone.crimes.length} recent crimes nearby. Stay alert.`,
+          crimeCount: dangerZone.crimes.length,
+        });
+        setAlertShown(hotspotId);
+
+        // Show toast notification
+        toast({
+          title: "⚠️ Danger Zone Alert",
+          description: `You're entering a high-crime area with ${dangerZone.crimes.length} recent incidents. Stay alert and avoid if possible.`,
+          variant: "destructive",
+        });
+      }
+    } else {
+      setDangerZoneAlert(null);
+    }
+  }, [location, recentCrimes, alertShown, toast]);
 
   // Handle SOS button click
   const handleSosClick = () => {
@@ -306,6 +410,40 @@ export default function Home() {
           Your personal safety dashboard
         </p>
       </div>
+
+      {/* Predictive Safety Alert - High-Crime Zone Warning */}
+      {dangerZoneAlert && (
+        <Card className="border-destructive/50 bg-destructive/5 relative z-10 animate-pulse" data-testid="alert-danger-zone">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <AlertOctagon className="h-6 w-6 text-destructive flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-destructive mb-1">Danger Zone Alert</h3>
+                <p className="text-sm text-destructive/90">
+                  You're within 1km of a high-crime area with {dangerZoneAlert.crimeCount} recent incidents. 
+                  Stay alert, avoid if possible, and keep your phone charged.
+                </p>
+                <Button
+                  onClick={() => setNavigateLocation("/crime-map")}
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  data-testid="button-view-danger-map"
+                >
+                  View Crime Map
+                </Button>
+              </div>
+              <button
+                onClick={() => setDangerZoneAlert(null)}
+                className="text-destructive/50 hover:text-destructive flex-shrink-0"
+                data-testid="button-dismiss-danger-alert"
+              >
+                ✕
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 relative z-10">
