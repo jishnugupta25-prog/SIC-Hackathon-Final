@@ -264,7 +264,7 @@ export default function AdminPanel() {
                       </p>
                       {(crime as any).reporter && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          By: {(crime as any).reporter.firstName} {(crime as any).reporter.lastName}
+                          By: {crime.isAnonymous ? "Anonymous User" : `${(crime as any).reporter.firstName} ${(crime as any).reporter.lastName}`}
                         </p>
                       )}
                     </div>
@@ -365,8 +365,14 @@ export default function AdminPanel() {
                   {/* Reporter Info - Compact */}
                   {(selectedCrime as any).reporter && (
                     <div className="bg-secondary/30 p-2 rounded text-xs space-y-1">
-                      <p className="font-semibold">{(selectedCrime as any).reporter.firstName} {(selectedCrime as any).reporter.lastName}</p>
-                      <p className="text-muted-foreground break-all">{(selectedCrime as any).reporter.email}</p>
+                      {selectedCrime.isAnonymous ? (
+                        <p className="font-semibold">Anonymous User</p>
+                      ) : (
+                        <>
+                          <p className="font-semibold">{(selectedCrime as any).reporter.firstName} {(selectedCrime as any).reporter.lastName}</p>
+                          <p className="text-muted-foreground break-all">{(selectedCrime as any).reporter.email}</p>
+                        </>
+                      )}
                     </div>
                   )}
 
