@@ -5,17 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 type CrimeForReview = {
   id: string;
@@ -40,6 +34,7 @@ export default function AdminPanel() {
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Check if admin is authenticated on component mount
   useEffect(() => {
@@ -91,6 +86,8 @@ export default function AdminPanel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/crimes"] });
+      setIsModalOpen(false);
+      setSelectedCrimeId(null);
     },
   });
 
@@ -101,6 +98,8 @@ export default function AdminPanel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/crimes"] });
+      setIsModalOpen(false);
+      setSelectedCrimeId(null);
     },
   });
 
@@ -133,6 +132,16 @@ export default function AdminPanel() {
     } finally {
       setFeedbackLoading(false);
     }
+  };
+
+  const handleSelectCrime = (crimeId: string) => {
+    setSelectedCrimeId(crimeId);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedCrimeId(null);
   };
 
   const pendingCrimes = crimes.filter((c) => !c.approval || c.approval.status === "pending");
@@ -218,126 +227,134 @@ export default function AdminPanel() {
         </Card>
       </div>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Crimes List */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5" />
-                Crime Reports
-              </CardTitle>
-              <CardDescription>
-                {isLoading ? "Loading..." : `${crimes.length} reports total`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="text-center text-muted-foreground py-8">Loading reports...</div>
-              ) : crimes.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">No reports found</div>
-              ) : (
-                <div className="space-y-2">
-                  {crimes.map((crime) => (
-                    <div
-                      key={crime.id}
-                      onClick={() => setSelectedCrimeId(crime.id)}
-                      className={`p-4 rounded-lg border-2 cursor-pointer transition-colors ${
-                        selectedCrimeId === crime.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                      data-testid={`card-crime-${crime.id}`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <p className="font-semibold">{crime.crimeType}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {crime.address || `${crime.latitude.toFixed(4)}°, ${crime.longitude.toFixed(4)}°`}
-                          </p>
-                          {(crime as any).reporter && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              By: {(crime as any).reporter.firstName} {(crime as any).reporter.lastName}
-                            </p>
-                          )}
-                        </div>
-                        <Badge
-                          className={
-                            crime.approval?.status === "approved"
-                              ? "bg-green-500/20 text-green-700 dark:text-green-400"
-                              : crime.approval?.status === "rejected"
-                              ? "bg-red-500/20 text-red-700 dark:text-red-400"
-                              : "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400"
-                          }
-                        >
-                          {crime.approval?.status === "approved"
-                            ? "Approved"
-                            : crime.approval?.status === "rejected"
-                            ? "Rejected"
-                            : "Pending"}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {crime.reportedAt
-                          ? formatDistanceToNow(new Date(crime.reportedAt), { addSuffix: true })
-                          : "Unknown"}
+      {/* Crime Reports List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            Crime Reports
+          </CardTitle>
+          <CardDescription>
+            {isLoading ? "Loading..." : `${crimes.length} reports total`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="text-center text-muted-foreground py-8">Loading reports...</div>
+          ) : crimes.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">No reports found</div>
+          ) : (
+            <div className="space-y-2">
+              {crimes.map((crime) => (
+                <div
+                  key={crime.id}
+                  onClick={() => handleSelectCrime(crime.id)}
+                  className="p-4 rounded-lg border-2 border-border cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary/5"
+                  data-testid={`card-crime-${crime.id}`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <p className="font-semibold">{crime.crimeType}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {crime.address || `${crime.latitude.toFixed(4)}°, ${crime.longitude.toFixed(4)}°`}
                       </p>
+                      {(crime as any).reporter && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          By: {(crime as any).reporter.firstName} {(crime as any).reporter.lastName}
+                        </p>
+                      )}
                     </div>
-                  ))}
+                    <Badge
+                      className={
+                        crime.approval?.status === "approved"
+                          ? "bg-green-500/20 text-green-700 dark:text-green-400"
+                          : crime.approval?.status === "rejected"
+                          ? "bg-red-500/20 text-red-700 dark:text-red-400"
+                          : "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400"
+                      }
+                    >
+                      {crime.approval?.status === "approved"
+                        ? "Approved"
+                        : crime.approval?.status === "rejected"
+                        ? "Rejected"
+                        : "Pending"}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {crime.reportedAt
+                      ? formatDistanceToNow(new Date(crime.reportedAt), { addSuffix: true })
+                      : "Unknown"}
+                  </p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Details Panel */}
-        <div className="space-y-4">
+      {/* Report Details Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh]" data-testid="dialog-report-details">
           {selectedCrime ? (
-            <>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+            <ScrollArea className="h-full">
+              <div className="pr-4">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
                     <MapPin className="h-5 w-5" />
-                    Report Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                    {selectedCrime.crimeType}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Report submitted {selectedCrime.reportedAt
+                      ? formatDistanceToNow(new Date(selectedCrime.reportedAt), { addSuffix: true })
+                      : "Unknown"}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                  {/* Reporter Information */}
                   {(selectedCrime as any).reporter && (
-                    <>
-                      <div className="bg-secondary/50 p-3 rounded-lg">
-                        <p className="text-xs font-semibold text-muted-foreground mb-2">Reporter Information</p>
-                        <div className="space-y-2">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Name</p>
-                            <p className="text-sm font-semibold">{(selectedCrime as any).reporter.firstName} {(selectedCrime as any).reporter.lastName}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Email</p>
-                            <p className="text-sm">{(selectedCrime as any).reporter.email}</p>
-                          </div>
+                    <div className="bg-secondary/50 p-4 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-3">Reporter Information</p>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Name</p>
+                          <p className="text-sm font-semibold">{(selectedCrime as any).reporter.firstName} {(selectedCrime as any).reporter.lastName}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Email</p>
+                          <p className="text-sm">{(selectedCrime as any).reporter.email}</p>
                         </div>
                       </div>
-                    </>
+                    </div>
                   )}
+
+                  {/* Crime Type */}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground">Crime Type</p>
                     <p className="text-sm font-semibold mt-1">{selectedCrime.crimeType}</p>
                   </div>
+
+                  {/* Description */}
                   {selectedCrime.description && (
                     <div>
                       <p className="text-xs font-semibold text-muted-foreground">Description</p>
                       <p className="text-sm mt-1">{selectedCrime.description}</p>
                     </div>
                   )}
+
+                  {/* Location */}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground">Location Address</p>
                     <p className="text-sm mt-1">{selectedCrime.address || "Not specified"}</p>
                   </div>
+
+                  {/* Coordinates */}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground">Exact Coordinates</p>
                     <p className="text-sm mt-1 font-mono text-xs">{selectedCrime.latitude.toFixed(6)}°, {selectedCrime.longitude.toFixed(6)}°</p>
                   </div>
+
+                  {/* Submission Time */}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
                       <Clock className="h-3 w-3" />
@@ -366,6 +383,7 @@ export default function AdminPanel() {
                     </div>
                   </div>
 
+                  {/* Status */}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground">Status</p>
                     <Badge
@@ -385,8 +403,9 @@ export default function AdminPanel() {
                     </Badge>
                   </div>
 
+                  {/* Approve/Reject Buttons */}
                   {(!selectedCrime.approval || selectedCrime.approval.status === "pending") && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 py-4">
                       <Button
                         onClick={() => approveMutation.mutate(selectedCrime.id)}
                         className="flex-1 bg-green-600 hover:bg-green-700"
@@ -449,18 +468,12 @@ export default function AdminPanel() {
                       {feedbackLoading ? "Sending..." : "Send Feedback"}
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
-            </>
-          ) : (
-            <Card>
-              <CardContent className="flex items-center justify-center h-64 text-muted-foreground">
-                Select a report to view details
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+                </div>
+              </div>
+            </ScrollArea>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
