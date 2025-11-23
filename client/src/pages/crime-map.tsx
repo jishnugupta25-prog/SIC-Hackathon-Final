@@ -218,24 +218,23 @@ export default function CrimeMap() {
       .addTo(leafletMap);
 
     // Add circles for sensitive areas (high crime density zones)
-    const crimeHotspots = new Map<string, { lat: number; lon: number; count: number }>();
+    const crimeHotspots: Record<string, { lat: number; lon: number; count: number }> = {};
     
     crimes.forEach((crime) => {
       const key = `${Math.round(crime.latitude * 100)},${Math.round(crime.longitude * 100)}`;
-      if (crimeHotspots.has(key)) {
-        const spot = crimeHotspots.get(key)!;
-        spot.count++;
+      if (crimeHotspots[key]) {
+        crimeHotspots[key].count++;
       } else {
-        crimeHotspots.set(key, {
+        crimeHotspots[key] = {
           lat: crime.latitude,
           lon: crime.longitude,
           count: 1,
-        });
+        };
       }
     });
 
     // Draw sensitive areas as circles based on crime concentration
-    crimeHotspots.forEach((hotspot: { lat: number; lon: number; count: number }) => {
+    Object.values(crimeHotspots).forEach((hotspot: { lat: number; lon: number; count: number }) => {
       const intensity = Math.min(hotspot.count / 5, 1); // Max intensity at 5+ crimes
       const radius = 300 + intensity * 1200; // 300m to 1500m radius
       const opacity = 0.2 + intensity * 0.3; // 0.2 to 0.5 opacity
