@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 
 type CrimeForReview = {
   id: string;
+  referenceNumber?: string;
   userId: string;
   crimeType: string;
   description?: string;
@@ -340,6 +341,14 @@ export default function AdminPanel() {
 
               <ScrollArea className="flex-1 overflow-y-auto">
                 <div className="pr-4 space-y-2 pb-4">
+                  {/* Reference Number */}
+                  {selectedCrime.referenceNumber && (
+                    <div className="bg-primary/10 border border-primary/20 rounded p-2 text-xs space-y-1">
+                      <p className="text-muted-foreground">Reference Number</p>
+                      <p className="font-mono font-bold text-primary text-sm">{selectedCrime.referenceNumber}</p>
+                    </div>
+                  )}
+
                   {/* Quick Status & Action */}
                   <div className="flex items-center justify-between bg-muted/50 p-2 rounded-lg">
                     <Badge

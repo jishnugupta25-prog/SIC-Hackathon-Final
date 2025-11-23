@@ -70,6 +70,7 @@ export type EmergencyContact = typeof emergencyContacts.$inferSelect;
 // Crime Reports table
 export const crimeReports = pgTable("crime_reports", {
   id: varchar("id").primaryKey(),
+  referenceNumber: varchar("reference_number", { length: 10 }).notNull().unique(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   crimeType: varchar("crime_type", { length: 100 }).notNull(),
   description: text("description"),
@@ -91,6 +92,7 @@ export const crimeReportsRelations = relations(crimeReports, ({ one }) => ({
 
 export const insertCrimeReportSchema = createInsertSchema(crimeReports).omit({
   id: true,
+  referenceNumber: true,
   createdAt: true,
   reportedAt: true,
 }).extend({

@@ -157,9 +157,23 @@ export class DatabaseStorage implements IStorage {
   async createCrimeReport(report: InsertCrimeReport): Promise<CrimeReport> {
     const db = await getDb();
     const now = new Date();
+    
+    // Generate unique 10-digit reference number
+    let referenceNumber = '';
+    let isUnique = false;
+    while (!isUnique) {
+      referenceNumber = Math.floor(Math.random() * 10000000000).toString().padStart(10, '0');
+      const existing = await db
+        .select()
+        .from(crimeReports)
+        .where(eq(crimeReports.referenceNumber, referenceNumber))
+        .limit(1);
+      isUnique = existing.length === 0;
+    }
+    
     const [newReport] = await db
       .insert(crimeReports)
-      .values({ ...report, id: randomUUID(), createdAt: now, reportedAt: now })
+      .values({ ...report, id: randomUUID(), referenceNumber, createdAt: now, reportedAt: now })
       .returning();
     return newReport;
   }

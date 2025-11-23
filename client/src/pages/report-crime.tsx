@@ -52,6 +52,7 @@ export default function ReportCrime() {
   const { toast } = useToast();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [referenceNumber, setReferenceNumber] = useState<string>("");
   const [selectedLocation, setSelectedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedAddress, setSelectedAddress] = useState<string>("");
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
@@ -180,9 +181,10 @@ export default function ReportCrime() {
     mutationFn: async (data: ReportFormData) => {
       return await apiRequest("POST", "/api/crimes", data);
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crimes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crimes/recent"] });
+      setReferenceNumber(data.referenceNumber);
       setIsSuccess(true);
       toast({
         title: "Crime Reported",
@@ -283,6 +285,13 @@ export default function ReportCrime() {
             <p className="text-muted-foreground text-center mb-6">
               Thank you for reporting. Your submission helps keep the community safe.
             </p>
+            {referenceNumber && (
+              <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 mb-6 w-full">
+                <p className="text-sm text-muted-foreground text-center">Your Reference Number is -</p>
+                <p className="text-2xl font-heading font-bold text-center text-primary">{referenceNumber}</p>
+                <p className="text-xs text-muted-foreground text-center mt-2">Save this for your records</p>
+              </div>
+            )}
             <div className="flex gap-3">
               <Button onClick={() => setIsSuccess(false)} data-testid="button-report-another">
                 Report Another Crime

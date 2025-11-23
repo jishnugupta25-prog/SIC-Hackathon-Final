@@ -9,6 +9,8 @@ import { useEffect } from "react";
 
 type CrimeWithApproval = {
   id: string;
+  referenceNumber?: string;
+  phoneNumber?: string;
   userId: string;
   crimeType: string;
   description?: string;
@@ -125,6 +127,14 @@ export default function MyCrimeReports() {
               </CardHeader>
 
               <CardContent className="space-y-4">
+                {/* Reference Number */}
+                {crime.referenceNumber && (
+                  <div className="bg-primary/10 border border-primary/20 rounded p-3">
+                    <p className="text-xs text-muted-foreground">Reference Number</p>
+                    <p className="text-lg font-mono font-bold text-primary">{crime.referenceNumber}</p>
+                  </div>
+                )}
+
                 {/* Description */}
                 {crime.description && (
                   <div className="space-y-1">
