@@ -11,6 +11,7 @@ export interface VoiceCommandConfig {
 export function useVoiceCommands(config: VoiceCommandConfig) {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const shouldRestartRef = useRef(true);
 
   useEffect(() => {
     // Check if browser supports Web Speech API
@@ -61,26 +62,38 @@ export function useVoiceCommands(config: VoiceCommandConfig) {
 
     recognition.onerror = (event: any) => {
       console.error('[Voice Commands] Error:', event.error);
-      config.onError?.(`Voice recognition error: ${event.error}`);
+      // Silently continue listening, don't report errors
     };
 
     recognition.onend = () => {
       setIsListening(false);
       config.onListeningEnd?.();
-      console.log('[Voice Commands] Listening stopped');
+      console.log('[Voice Commands] Listening stopped, auto-restarting...');
       
-      // Auto restart if we're meant to be listening
-      // This helps maintain continuous listening
-      if (isListening) {
+      // Auto restart listening if we should keep going
+      if (shouldRestartRef.current) {
         try {
-          recognition.start();
+          setTimeout(() => {
+            if (shouldRestartRef.current && recognitionRef.current) {
+              console.log('[Voice Commands] Restarting listening...');
+              recognitionRef.current.start();
+            }
+          }, 100);
         } catch (error) {
-          console.log('[Voice Commands] Auto-restart failed (likely already listening)');
+          console.log('[Voice Commands] Auto-restart failed:', error);
         }
       }
     };
 
+    // Start listening immediately
+    try {
+      recognition.start();
+    } catch (error) {
+      console.log('[Voice Commands] Start failed:', error);
+    }
+
     return () => {
+      shouldRestartRef.current = false;
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
@@ -91,17 +104,8 @@ export function useVoiceCommands(config: VoiceCommandConfig) {
     };
   }, [config]);
 
-  const startListening = () => {
-    if (recognitionRef.current && !isListening) {
-      try {
-        recognitionRef.current.start();
-      } catch (error) {
-        console.log('[Voice Commands] Start failed:', error);
-      }
-    }
-  };
-
   const stopListening = () => {
+    shouldRestartRef.current = false;
     if (recognitionRef.current && isListening) {
       try {
         recognitionRef.current.stop();
@@ -111,18 +115,8 @@ export function useVoiceCommands(config: VoiceCommandConfig) {
     }
   };
 
-  const toggleListening = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
-    }
-  };
-
   return {
     isListening,
-    startListening,
     stopListening,
-    toggleListening,
   };
 }

@@ -42,7 +42,7 @@ export default function Home() {
   });
 
   // Voice commands hook for SOS activation - always enabled
-  const { isListening, startListening } = useVoiceCommands({
+  const { isListening, stopListening } = useVoiceCommands({
     keywords: ["SOS", "emergency", "help", "danger", "mayday"],
     onCommandDetected: (keyword) => {
       console.log(`[Voice SOS] Detected: "${keyword}"`);
@@ -81,9 +81,10 @@ export default function Home() {
     },
   });
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated and stop listening
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
+      stopListening();
       toast({
         title: "Unauthorized",
         description: "You are logged out. Logging in again...",
@@ -93,14 +94,7 @@ export default function Home() {
         window.location.href = "/api/login";
       }, 500);
     }
-  }, [isAuthenticated, authLoading, toast]);
-
-  // Auto-start voice listening on mount when authenticated
-  useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      startListening();
-    }
-  }, [isAuthenticated, authLoading]);
+  }, [isAuthenticated, authLoading, toast, stopListening]);
 
   // Calculate safety score based on crime count
   const calculateSafetyScore = (crimeCount: number) => {
