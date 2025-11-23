@@ -287,6 +287,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(adminFeedback.userId, userId))
       .orderBy(desc(adminFeedback.createdAt));
   }
+
+  async getCrimeFeedback(crimeId: string): Promise<AdminFeedback[]> {
+    const db = await getDb();
+    return await db
+      .select()
+      .from(adminFeedback)
+      .where(eq(adminFeedback.crimeId, crimeId))
+      .orderBy(desc(adminFeedback.createdAt));
+  }
 }
 
 export const storage = new DatabaseStorage();

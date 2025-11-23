@@ -74,6 +74,12 @@ export default function AdminPanel() {
     enabled: isAdminAuthenticated === true, // Only fetch if authenticated
   });
 
+  // Fetch feedback for selected crime
+  const { data: crimeFeedback = [] } = useQuery({
+    queryKey: [`/api/admin/crimes/${selectedCrimeId}/feedback`],
+    enabled: !!selectedCrimeId && isAdminAuthenticated === true,
+  });
+
   const crimes: CrimeForReview[] = Array.isArray(crimesData) ? crimesData : [];
   const selectedCrime = crimes.find((c) => c.id === selectedCrimeId);
 
@@ -109,6 +115,7 @@ export default function AdminPanel() {
     onSuccess: () => {
       setFeedbackMessage("");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/crimes"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/crimes/${selectedCrimeId}/feedback`] });
     },
   });
 
@@ -372,35 +379,47 @@ export default function AdminPanel() {
                       </Button>
                     </div>
                   )}
-                </CardContent>
-              </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5" />
-                    Send Feedback
-                  </CardTitle>
-                  <CardDescription>
-                    User will see this as "System Admin" message
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Textarea
-                    placeholder="Type your feedback message..."
-                    value={feedbackMessage}
-                    onChange={(e) => setFeedbackMessage(e.target.value)}
-                    className="resize-none"
-                    data-testid="textarea-feedback"
-                  />
-                  <Button
-                    onClick={handleSendFeedback}
-                    disabled={feedbackLoading || !feedbackMessage.trim()}
-                    className="w-full"
-                    data-testid="button-send-feedback"
-                  >
-                    {feedbackLoading ? "Sending..." : "Send Feedback"}
-                  </Button>
+                  {/* Feedback Section */}
+                  <div className="border-t pt-4 mt-4">
+                    <p className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Feedback Messages ({Array.isArray(crimeFeedback) ? crimeFeedback.length : 0})
+                    </p>
+                    
+                    {Array.isArray(crimeFeedback) && crimeFeedback.length > 0 && (
+                      <div className="space-y-2 mb-4 bg-secondary/30 p-3 rounded-lg">
+                        {crimeFeedback.map((feedback: any) => (
+                          <div key={feedback.id} className="bg-background p-2 rounded border-l-2 border-blue-500">
+                            <div className="flex justify-between items-start mb-1">
+                              <p className="text-xs font-semibold">System Admin</p>
+                              <p className="text-xs text-muted-foreground">
+                                {feedback.createdAt ? new Date(feedback.createdAt).toLocaleDateString() : ""}
+                              </p>
+                            </div>
+                            <p className="text-sm text-foreground">{feedback.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <Textarea
+                      placeholder="Type your feedback message..."
+                      value={feedbackMessage}
+                      onChange={(e) => setFeedbackMessage(e.target.value)}
+                      className="resize-none mb-2"
+                      data-testid="textarea-feedback"
+                    />
+                    <Button
+                      onClick={handleSendFeedback}
+                      disabled={feedbackLoading || !feedbackMessage.trim()}
+                      className="w-full"
+                      size="sm"
+                      data-testid="button-send-feedback"
+                    >
+                      {feedbackLoading ? "Sending..." : "Send Feedback"}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </>

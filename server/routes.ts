@@ -1190,6 +1190,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get feedback for a specific crime
+  app.get('/api/admin/crimes/:crimeId/feedback', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { crimeId } = req.params;
+      const feedback = await storage.getCrimeFeedback(crimeId);
+      res.json(feedback);
+    } catch (error) {
+      console.error("Error fetching crime feedback:", error);
+      res.status(500).json({ message: "Failed to fetch feedback" });
+    }
+  });
+
+  // Get feedback for a user's crime report
+  app.get('/api/crime/:crimeId/feedback', isAuthenticated, async (req: any, res) => {
+    try {
+      const { crimeId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify the crime belongs to the user
+      const crimes = await storage.getUserCrimeReports(userId);
+      const crime = crimes.find(c => c.id === crimeId);
+      
+      if (!crime) {
+        return res.status(403).json({ message: "Not authorized to view this crime's feedback" });
+      }
+      
+      const feedback = await storage.getCrimeFeedback(crimeId);
+      res.json(feedback);
+    } catch (error) {
+      console.error("Error fetching crime feedback:", error);
+      res.status(500).json({ message: "Failed to fetch feedback" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
