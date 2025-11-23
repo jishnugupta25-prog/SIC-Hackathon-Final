@@ -20,6 +20,7 @@ type CrimeForReview = {
   latitude: number;
   longitude: number;
   address?: string;
+  phoneNumber?: string;
   isAnonymous: number;
   reportedAt?: string;
   createdAt?: string;
@@ -372,6 +373,9 @@ export default function AdminPanel() {
                         <>
                           <p className="font-semibold">{(selectedCrime as any).reporter.firstName} {(selectedCrime as any).reporter.lastName}</p>
                           <p className="text-muted-foreground break-all">{(selectedCrime as any).reporter.email}</p>
+                          {selectedCrime.phoneNumber && (
+                            <p className="text-muted-foreground break-all font-mono">{selectedCrime.phoneNumber}</p>
+                          )}
                         </>
                       )}
                     </div>
