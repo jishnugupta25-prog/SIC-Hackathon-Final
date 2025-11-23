@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, MapPin, Route, Shield, Navigation, Zap, Locate, Search, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AlertTriangle, MapPin, Route, Shield, Navigation, Zap, Locate, Search, X, MapIcon } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -40,13 +41,13 @@ export default function SafeRoutes() {
   const [routes, setRoutes] = useState<SafeRoute[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState<SafeRoute | null>(null);
+  const [showRouteModal, setShowRouteModal] = useState(false);
   const [startSuggestions, setStartSuggestions] = useState<LocationSuggestion[]>([]);
   const [endSuggestions, setEndSuggestions] = useState<LocationSuggestion[]>([]);
   const [showStartSuggestions, setShowStartSuggestions] = useState(false);
   const [showEndSuggestions, setShowEndSuggestions] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
-  const endSuggestionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -333,11 +334,26 @@ export default function SafeRoutes() {
     }
   };
 
+  // Handle route selection - open modal
+  const handleSelectRoute = (route: SafeRoute) => {
+    setSelectedRoute(route);
+    setShowRouteModal(true);
+  };
+
+  // Open Google Maps directions
+  const handleGetDirections = () => {
+    if (!startCoords || !endCoords) return;
+
+    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${startCoords.latitude},${startCoords.longitude}&destination=${endCoords.latitude},${endCoords.longitude}&travelmode=driving`;
+    window.open(googleMapsUrl, "_blank");
+  };
+
+  // Initialize route map in modal
   useEffect(() => {
-    if (!selectedRoute) return;
+    if (!showRouteModal || !selectedRoute) return;
 
     try {
-      const container = document.getElementById("route-map");
+      const container = document.getElementById("route-modal-map");
       if (!container || !location) return;
 
       const existingLeafletId = (container as any)._leaflet_id;
@@ -403,7 +419,7 @@ export default function SafeRoutes() {
     } catch (error) {
       console.error("Error initializing route map:", error);
     }
-  }, [selectedRoute, location]);
+  }, [showRouteModal, selectedRoute, location]);
 
   if (authLoading) {
     return (
@@ -537,10 +553,7 @@ export default function SafeRoutes() {
 
                   {/* End Location Suggestions Dropdown */}
                   {showEndSuggestions && endSuggestions.length > 0 && (
-                    <div 
-                      ref={endSuggestionsRef}
-                      className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto"
-                    >
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
                       {endSuggestions.map((suggestion, idx) => (
                         <button
                           key={idx}
@@ -584,19 +597,17 @@ export default function SafeRoutes() {
             <Card>
               <CardHeader>
                 <CardTitle>Available Routes</CardTitle>
-                <CardDescription>Select a route to view details</CardDescription>
+                <CardDescription>Click a route to view details and get directions</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {routes.map((route) => (
                   <div
                     key={route.id}
-                    onClick={() => setSelectedRoute(route)}
+                    onClick={() => handleSelectRoute(route)}
                     className="p-4 border rounded-lg cursor-pointer hover-elevate transition-all"
                     style={{
                       borderLeftColor: route.color,
                       borderLeftWidth: "4px",
-                      backgroundColor:
-                        selectedRoute?.id === route.id ? "rgba(59, 130, 246, 0.1)" : undefined,
                     }}
                     data-testid={`route-option-${route.id}`}
                   >
@@ -633,56 +644,8 @@ export default function SafeRoutes() {
           )}
         </div>
 
-        {/* Map & Info */}
+        {/* Safety Tips Sidebar */}
         <div className="space-y-4">
-          {selectedRoute && (
-            <>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Route Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Distance</p>
-                    <p className="font-semibold">{selectedRoute.distance.toFixed(1)} km</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Estimated Time</p>
-                    <p className="font-semibold">{selectedRoute.duration} minutes</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Safety Score</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${selectedRoute.safetyScore > 0.7 ? "bg-green-500" : selectedRoute.safetyScore > 0.4 ? "bg-yellow-500" : "bg-red-500"}`}
-                          style={{ width: `${selectedRoute.safetyScore * 100}%` }}
-                        />
-                      </div>
-                      <span className="font-semibold text-sm">{(selectedRoute.safetyScore * 100).toFixed(0)}%</span>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Crime Reports Nearby</p>
-                    <p className="font-semibold text-sm">{selectedRoute.crimeCount} incidents</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
-
-          {selectedRoute && (
-            <Card>
-              <CardContent className="pt-6">
-                <div
-                  id="route-map"
-                  className="bg-muted rounded-md"
-                  style={{ height: "300px" }}
-                />
-              </CardContent>
-            </Card>
-          )}
-
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -700,6 +663,79 @@ export default function SafeRoutes() {
           </Card>
         </div>
       </div>
+
+      {/* Route Details Modal */}
+      <Dialog open={showRouteModal} onOpenChange={setShowRouteModal}>
+        <DialogContent className="max-w-lg" data-testid="dialog-route-details">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapIcon className="h-5 w-5" />
+              {selectedRoute?.name}
+            </DialogTitle>
+            <DialogDescription>Route details and navigation options</DialogDescription>
+          </DialogHeader>
+
+          {selectedRoute && (
+            <div className="space-y-4">
+              {/* Route Map */}
+              <div
+                id="route-modal-map"
+                className="bg-muted rounded-md"
+                style={{ height: "250px" }}
+              />
+
+              {/* Route Details */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-muted p-3 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Distance</p>
+                  <p className="font-semibold">{selectedRoute.distance.toFixed(1)} km</p>
+                </div>
+                <div className="bg-muted p-3 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Estimated Time</p>
+                  <p className="font-semibold">{selectedRoute.duration} min</p>
+                </div>
+                <div className="bg-muted p-3 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Safety Score</p>
+                  <p className="font-semibold">{(selectedRoute.safetyScore * 100).toFixed(0)}%</p>
+                </div>
+                <div className="bg-muted p-3 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Crime Reports</p>
+                  <p className="font-semibold">{selectedRoute.crimeCount} nearby</p>
+                </div>
+              </div>
+
+              {/* Safety Score Bar */}
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Safety Level</p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${selectedRoute.safetyScore > 0.7 ? "bg-green-500" : selectedRoute.safetyScore > 0.4 ? "bg-yellow-500" : "bg-red-500"}`}
+                      style={{ width: `${selectedRoute.safetyScore * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Recommendation */}
+              <div className="bg-muted p-3 rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">Recommendation</p>
+                <p className="text-sm">{selectedRoute.recommendation}</p>
+              </div>
+
+              {/* Directions Button */}
+              <Button
+                onClick={handleGetDirections}
+                className="w-full"
+                data-testid="button-get-directions"
+              >
+                <MapIcon className="h-4 w-4 mr-2" />
+                Get Directions in Google Maps
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
