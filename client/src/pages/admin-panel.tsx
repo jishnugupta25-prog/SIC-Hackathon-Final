@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock, X } from "lucide-react";
+import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock, X, Navigation } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -374,11 +374,25 @@ export default function AdminPanel() {
                     </div>
                   )}
 
-                  {/* Location & Coordinates */}
+                  {/* Location & Coordinates with Directions */}
                   <div className="text-xs space-y-1">
                     <p className="font-semibold text-muted-foreground">Location</p>
                     <p className="text-sm">{selectedCrime.address || "Not specified"}</p>
                     <p className="font-mono text-xs text-muted-foreground">{selectedCrime.latitude.toFixed(6)}°, {selectedCrime.longitude.toFixed(6)}°</p>
+                    <Button
+                      onClick={() => {
+                        window.open(
+                          `https://www.google.com/maps/search/?api=1&query=${selectedCrime.latitude},${selectedCrime.longitude}`,
+                          "_blank"
+                        );
+                      }}
+                      variant="outline"
+                      className="w-full h-7 mt-2 text-xs"
+                      data-testid="button-directions"
+                    >
+                      <Navigation className="h-3 w-3 mr-1" />
+                      Directions
+                    </Button>
                   </div>
 
                   {/* Submission Time - Compact */}
