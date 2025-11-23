@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock, X, Navigation, Phone, Users, TrendingUp, BarChart3 } from "lucide-react";
+import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock, X, Navigation, Phone, Users, TrendingUp, BarChart3, RefreshCw } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -60,6 +60,7 @@ export default function AdminPanel() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Check if admin is authenticated on component mount
   useEffect(() => {
@@ -193,6 +194,16 @@ export default function AdminPanel() {
     setSelectedCrimeId(null);
   };
 
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/users-tracking"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/admin/users-tracking"] });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const pendingCrimes = crimes.filter((c) => !c.approval || c.approval.status === "pending");
   const approvedCrimes = crimes.filter((c) => c.approval?.status === "approved");
   const rejectedCrimes = crimes.filter((c) => c.approval?.status === "rejected");
@@ -306,6 +317,15 @@ export default function AdminPanel() {
               data-testid="button-toggle-refresh"
             >
               {autoRefresh ? "Pause" : "Resume"}
+            </button>
+            <button
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="px-3 py-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 text-sm font-medium flex items-center gap-2"
+              data-testid="button-manual-refresh"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              Refresh
             </button>
           </div>
         </div>
