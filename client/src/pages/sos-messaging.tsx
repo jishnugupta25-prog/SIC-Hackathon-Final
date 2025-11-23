@@ -6,17 +6,14 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { AlertTriangle, Send, MapPin, Phone, User, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Send, MapPin, Phone, User, ArrowLeft } from "lucide-react";
 import type { EmergencyContact } from "@shared/schema";
 
 export default function SosMessaging() {
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [, setNavigateLocation] = useLocation();
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number; address?: string } | null>(null);
-  const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
-  const [sendingTo, setSendingTo] = useState<string | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -26,9 +23,9 @@ export default function SosMessaging() {
         description: "You need to be logged in",
         variant: "destructive",
       });
-      setLocation("/login");
+      setNavigateLocation("/login");
     }
-  }, [isAuthenticated, setLocation, toast]);
+  }, [isAuthenticated, setNavigateLocation, toast]);
 
   // Fetch emergency contacts
   const { data: contacts = [] } = useQuery<EmergencyContact[]>({
@@ -103,7 +100,7 @@ export default function SosMessaging() {
     };
   }, []);
 
-  // SOS Alert mutation
+  // SOS Alert mutation - sends to all contacts
   const sosMutation = useMutation({
     mutationFn: async () => {
       if (!userLocation) {
@@ -117,11 +114,10 @@ export default function SosMessaging() {
     onSuccess: () => {
       toast({
         title: "SOS Alert Sent!",
-        description: `Emergency message sent to ${selectedContacts.size || contacts.length} contact${(selectedContacts.size || contacts.length) !== 1 ? 's' : ''}`,
+        description: `Emergency message sent to ${contacts.length} contact${contacts.length !== 1 ? 's' : ''}`,
       });
-      setSendingTo(null);
       setTimeout(() => {
-        setLocation("/");
+        setNavigateLocation("/");
       }, 1500);
       queryClient.invalidateQueries({ queryKey: ["/api/sos-history"] });
     },
@@ -131,40 +127,18 @@ export default function SosMessaging() {
         description: error.message || "Failed to send SOS alert",
         variant: "destructive",
       });
-      setSendingTo(null);
     },
   });
 
-  // Toggle contact selection
-  const toggleContact = (contactId: string) => {
-    const newSelected = new Set(selectedContacts);
-    if (newSelected.has(contactId)) {
-      newSelected.delete(contactId);
-    } else {
-      newSelected.add(contactId);
-    }
-    setSelectedContacts(newSelected);
-  };
-
-  // Select/deselect all
-  const toggleSelectAll = () => {
-    if (selectedContacts.size === contacts.length) {
-      setSelectedContacts(new Set());
-    } else {
-      setSelectedContacts(new Set(contacts.map(c => c.id)));
-    }
-  };
-
   const handleSendSOS = () => {
-    if (selectedContacts.size === 0 && contacts.length === 0) {
+    if (contacts.length === 0) {
       toast({
         title: "No Contacts",
-        description: "No emergency contacts selected",
+        description: "No emergency contacts added",
         variant: "destructive",
       });
       return;
     }
-    setSendingTo("sending");
     sosMutation.mutate();
   };
 
@@ -179,164 +153,136 @@ export default function SosMessaging() {
     );
   }
 
-  const contactsToSendTo = selectedContacts.size > 0 ? selectedContacts.size : contacts.length;
+  const messageContent = `I am in danger save me!!
+
+📍 Location: ${userLocation ? `${userLocation.latitude.toFixed(6)}, ${userLocation.longitude.toFixed(6)}` : 'Getting location...'}
+👤 From: ${user?.firstName || user?.email}`;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      {/* Emergency Alert Header */}
-      <Card className="border-destructive/50 bg-destructive/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-destructive">
-            <AlertTriangle className="h-5 w-5" />
-            Emergency SOS Alert
-          </CardTitle>
-          <CardDescription>
-            Your location and emergency message will be sent to selected contacts via SMS
-          </CardDescription>
-        </CardHeader>
-      </Card>
+    <div className="max-w-2xl mx-auto space-y-4 h-[calc(100vh-120px)] flex flex-col">
+      {/* Header with Back Button */}
+      <div className="flex items-center gap-3 pb-2 border-b">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setNavigateLocation("/")}
+          data-testid="button-back-to-home"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div className="flex-1">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            Emergency Alert
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Sending to {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+      </div>
 
-      {/* Location Information */}
+      {/* Recipients */}
+      {contacts.length > 0 && (
+        <Card className="border-gray-200 dark:border-gray-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Recipients</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {contacts.map((contact) => (
+              <div
+                key={contact.id}
+                className="flex items-center gap-3 p-2 bg-muted/30 rounded-md"
+              >
+                <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{contact.name}</p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Phone className="h-3 w-3 flex-shrink-0" />
+                    {contact.phoneNumber}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Location Card */}
       {userLocation && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
+        <Card className="border-gray-200 dark:border-gray-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
               <MapPin className="h-4 w-4" />
               Your Location
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="text-sm space-y-1">
+          <CardContent>
+            <div className="text-xs space-y-1 bg-muted/30 p-2 rounded-md">
               <p><span className="font-medium">Latitude:</span> {userLocation.latitude.toFixed(6)}</p>
               <p><span className="font-medium">Longitude:</span> {userLocation.longitude.toFixed(6)}</p>
-              {userLocation.address && (
-                <p><span className="font-medium">Location:</span> {userLocation.address}</p>
-              )}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Message Preview */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Emergency Message</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-muted p-4 rounded-md border">
-            <p className="font-medium text-sm">Message to be sent:</p>
-            <p className="mt-2 text-sm">
-              <strong>"I am in danger save me!!"</strong>
-            </p>
-            <p className="mt-3 text-xs text-muted-foreground">
-              📍 Location: {userLocation?.latitude.toFixed(6)}, {userLocation?.longitude.toFixed(6)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              👤 User: {user?.firstName} ({user?.email})
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Emergency Contacts Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Select Emergency Contacts</CardTitle>
-          <CardDescription>
-            Choose which contacts should receive your SOS alert
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {contacts.length === 0 ? (
-            <div className="text-center py-8">
-              <User className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">No emergency contacts added yet</p>
-              <Button asChild variant="outline" className="mt-4">
-                <a href="/contacts">Add Emergency Contacts</a>
-              </Button>
-            </div>
-          ) : (
-            <>
-              {/* Select All Option */}
-              <div className="flex items-center gap-3 p-3 border rounded-md hover-elevate cursor-pointer">
-                <Checkbox
-                  id="select-all"
-                  checked={selectedContacts.size === contacts.length && contacts.length > 0}
-                  onCheckedChange={toggleSelectAll}
-                  data-testid="checkbox-select-all-contacts"
-                />
-                <label htmlFor="select-all" className="flex-1 cursor-pointer">
-                  <p className="font-medium text-sm">Send to all {contacts.length} contact{contacts.length !== 1 ? 's' : ''}</p>
-                  <p className="text-xs text-muted-foreground">Select all emergency contacts at once</p>
-                </label>
-              </div>
-
-              {/* Individual Contacts */}
-              <div className="space-y-2 border-t pt-4">
-                {contacts.map((contact) => (
-                  <div
-                    key={contact.id}
-                    className="flex items-center gap-3 p-3 border rounded-md hover-elevate cursor-pointer"
-                  >
-                    <Checkbox
-                      id={`contact-${contact.id}`}
-                      checked={selectedContacts.has(contact.id)}
-                      onCheckedChange={() => toggleContact(contact.id)}
-                      data-testid={`checkbox-contact-${contact.id}`}
-                    />
-                    <label htmlFor={`contact-${contact.id}`} className="flex-1 cursor-pointer">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-sm">{contact.name}</p>
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
-                            {contact.phoneNumber}
-                          </p>
-                          {contact.relationship && (
-                            <p className="text-xs text-muted-foreground">{contact.relationship}</p>
-                          )}
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {/* Message Box */}
+      <div className="flex-1 flex flex-col gap-3">
+        <div className="flex-1 border rounded-md p-4 bg-muted/20 overflow-y-auto">
+          <p className="text-sm whitespace-pre-wrap text-foreground leading-relaxed font-mono">
+            {messageContent}
+          </p>
+        </div>
+      </div>
 
       {/* Send Button */}
-      {contacts.length > 0 && (
-        <Card className="border-green-200 dark:border-green-900">
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 rounded-md p-4">
-                <p className="text-sm font-medium text-green-900 dark:text-green-100">
-                  ✓ Ready to send to {contactsToSendTo} contact{contactsToSendTo !== 1 ? 's' : ''}
-                </p>
-              </div>
-              <Button
-                onClick={handleSendSOS}
-                disabled={sosMutation.isPending || contactsToSendTo === 0}
-                className="w-full bg-destructive hover:bg-destructive/90 h-12"
-                data-testid="button-send-sos"
-              >
-                <Send className="h-5 w-5 mr-2" />
-                {sosMutation.isPending ? "Sending SOS..." : "Send SOS Alert Now"}
-              </Button>
-              <Button
-                onClick={() => setLocation("/")}
-                variant="outline"
-                className="w-full"
-                data-testid="button-cancel-sos-messaging"
-              >
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      {contacts.length > 0 ? (
+        <div className="flex gap-3 pt-2 border-t">
+          <Button
+            onClick={() => setNavigateLocation("/")}
+            variant="outline"
+            className="flex-1"
+            data-testid="button-cancel-sos-messaging"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSendSOS}
+            disabled={sosMutation.isPending}
+            className="flex-1 bg-destructive hover:bg-destructive/90 h-10"
+            data-testid="button-send-sos"
+          >
+            {sosMutation.isPending ? (
+              <>
+                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send className="h-4 w-4 mr-2" />
+                Send to All
+              </>
+            )}
+          </Button>
+        </div>
+      ) : (
+        <div className="border-t pt-4 space-y-3">
+          <div className="text-center py-6 text-muted-foreground">
+            <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm font-medium">No emergency contacts added</p>
+            <p className="text-xs mt-1">Add contacts to send SOS alerts</p>
+          </div>
+          <Button asChild variant="outline" className="w-full" data-testid="button-add-contacts">
+            <a href="/contacts">Add Emergency Contacts</a>
+          </Button>
+          <Button
+            onClick={() => setNavigateLocation("/")}
+            variant="outline"
+            className="w-full"
+            data-testid="button-cancel-sos-messaging"
+          >
+            Cancel
+          </Button>
+        </div>
       )}
     </div>
   );
