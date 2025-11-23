@@ -183,143 +183,152 @@ export default function CrimeMap() {
   };
 
   useEffect(() => {
-    const container = document.getElementById("crime-map-container");
-    if (!container || !location) return;
+    try {
+      const container = document.getElementById("crime-map-container");
+      if (!container || !location) return;
 
-    // Clear any existing map instance
-    const existingLeafletId = (container as any)._leaflet_id;
-    if (existingLeafletId) {
-      delete (container as any)._leaflet_id;
-    }
-    container.innerHTML = ""; // Clear previous map content
+      // Clear any existing map instance
+      const existingLeafletId = (container as any)._leaflet_id;
+      if (existingLeafletId) {
+        delete (container as any)._leaflet_id;
+      }
+      container.innerHTML = ""; // Clear previous map content
 
-    // Initialize Leaflet map
-    const leafletMap = L.map(container).setView(
-      [location.latitude, location.longitude],
-      12
-    );
+      // Initialize Leaflet map
+      const leafletMap = L.map(container).setView(
+        [location.latitude, location.longitude],
+        12
+      );
 
-    // Add OpenStreetMap tile layer (real street map)
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '© OpenStreetMap contributors',
-      maxZoom: 19,
-    }).addTo(leafletMap);
+      // Add OpenStreetMap tile layer (real street map)
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution:
+          '© OpenStreetMap contributors',
+        maxZoom: 19,
+      }).addTo(leafletMap);
 
-    // Add user location marker
-    (L.circleMarker as any)([location.latitude, location.longitude], {
-      radius: 8,
-      fillColor: "#3b82f6",
-      color: "#1e40af",
-      weight: 3,
-      opacity: 1,
-      fillOpacity: 0.8,
-    })
-      .bindPopup("Your Location")
-      .addTo(leafletMap);
+      // Add user location marker
+      (L.circleMarker as any)([location.latitude, location.longitude], {
+        radius: 8,
+        fillColor: "#3b82f6",
+        color: "#1e40af",
+        weight: 3,
+        opacity: 1,
+        fillOpacity: 0.8,
+      })
+        .bindPopup("Your Location")
+        .addTo(leafletMap);
 
-    // Add heatmap layer showing crime density
-    if (showHeatmap) {
-      const crimeHotspots: Record<string, { lat: number; lon: number; count: number }> = {};
-      
-      crimes.forEach((crime) => {
-        const key = `${Math.round(crime.latitude * 100)},${Math.round(crime.longitude * 100)}`;
-        if (crimeHotspots[key]) {
-          crimeHotspots[key].count++;
-        } else {
-          crimeHotspots[key] = {
-            lat: crime.latitude,
-            lon: crime.longitude,
-            count: 1,
-          };
+      // Add heatmap layer showing crime density
+      if (showHeatmap && crimes.length > 0) {
+        const crimeHotspots: Record<string, { lat: number; lon: number; count: number }> = {};
+        
+        crimes.forEach((crime) => {
+          const key = `${Math.round(crime.latitude * 100)},${Math.round(crime.longitude * 100)}`;
+          if (crimeHotspots[key]) {
+            crimeHotspots[key].count++;
+          } else {
+            crimeHotspots[key] = {
+              lat: crime.latitude,
+              lon: crime.longitude,
+              count: 1,
+            };
+          }
+        });
+
+        // Draw heatmap: circles with gradient colors based on crime concentration
+        Object.values(crimeHotspots).forEach((hotspot: { lat: number; lon: number; count: number }) => {
+          const intensity = Math.min(hotspot.count / 5, 1); // Max intensity at 5+ crimes
+          const radius = 300 + intensity * 1200; // 300m to 1500m radius
+          
+          // Color gradient: Yellow (low) -> Orange (medium) -> Red (high)
+          let fillColor = "#fbbf24"; // Yellow for low crime (1-2 incidents)
+          if (intensity > 0.33) fillColor = "#f97316"; // Orange for medium (3-4 incidents)
+          if (intensity > 0.66) fillColor = "#ef4444"; // Red for high (5+ incidents)
+          
+          const opacity = 0.2 + intensity * 0.3; // 0.2 to 0.5 opacity
+
+          L.circle([hotspot.lat, hotspot.lon], {
+            radius: radius,
+            color: fillColor,
+            weight: 2,
+            opacity: opacity,
+            fillColor: fillColor,
+            fillOpacity: opacity * 0.4,
+          })
+            .bindPopup(
+              `<strong>Crime Density</strong><br/>Incidents: ${hotspot.count}<br/><em>Red=Highest danger zone</em>`
+            )
+            .addTo(leafletMap);
+        });
+      }
+
+      // Add crime report markers
+      crimes.forEach((crime, idx) => {
+        const markerColor = crimeColors[crime.crimeType] || "#6b7280";
+        
+        const customIcon = L.divIcon({
+          html: `
+            <div style="
+              width: 32px;
+              height: 32px;
+              background-color: ${markerColor};
+              border: 3px solid white;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+              color: white;
+              font-size: 12px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+              cursor: pointer;
+            ">${idx + 1}</div>
+          `,
+          iconSize: [32, 32],
+          className: "crime-marker-icon",
+        });
+
+        const marker = L.marker([crime.latitude, crime.longitude], {
+          icon: customIcon,
+        });
+
+        const popupContent = `
+          <div style="font-size: 12px;">
+            <strong>${crime.crimeType}</strong><br/>
+            ${crime.address ? `Location: ${crime.address}<br/>` : ''}
+            ${crime.description ? `Details: ${crime.description.substring(0, 50)}...<br/>` : ''}
+            Reported: ${new Date(crime.reportedAt || '').toLocaleDateString()}
+          </div>
+        `;
+
+        marker.bindPopup(popupContent).addTo(leafletMap);
+      });
+
+      // Fit map bounds to show all markers
+      if (crimes.length > 0) {
+        const group = new (L.FeatureGroup as any)([]);
+        crimes.forEach((crime) => {
+          group.addLayer(
+            L.marker([crime.latitude, crime.longitude])
+          );
+        });
+        group.addLayer(L.marker([location.latitude, location.longitude]));
+        leafletMap.fitBounds(group.getBounds().pad(0.1));
+      }
+
+      // Cleanup on unmount
+      return () => {
+        try {
+          leafletMap.remove();
+        } catch (e) {
+          console.error("Error cleaning up map:", e);
         }
-      });
-
-      // Draw heatmap: circles with gradient colors based on crime concentration
-      Object.values(crimeHotspots).forEach((hotspot: { lat: number; lon: number; count: number }) => {
-        const intensity = Math.min(hotspot.count / 5, 1); // Max intensity at 5+ crimes
-        const radius = 300 + intensity * 1200; // 300m to 1500m radius
-        
-        // Color gradient: Yellow (low) -> Orange (medium) -> Red (high)
-        let fillColor = "#fbbf24"; // Yellow for low crime (1-2 incidents)
-        if (intensity > 0.33) fillColor = "#f97316"; // Orange for medium (3-4 incidents)
-        if (intensity > 0.66) fillColor = "#ef4444"; // Red for high (5+ incidents)
-        
-        const opacity = 0.2 + intensity * 0.3; // 0.2 to 0.5 opacity
-
-        L.circle([hotspot.lat, hotspot.lon], {
-          radius: radius,
-          color: fillColor,
-          weight: 2,
-          opacity: opacity,
-          fillColor: fillColor,
-          fillOpacity: opacity * 0.4,
-        })
-          .bindPopup(
-            `<strong>Crime Density</strong><br/>Incidents: ${hotspot.count}<br/><em>Red=Highest danger zone</em>`
-          )
-          .addTo(leafletMap);
-      });
+      };
+    } catch (error) {
+      console.error("Error initializing crime map:", error);
+      // Still render the page even if map fails to initialize
     }
-
-    // Add crime report markers
-    crimes.forEach((crime, idx) => {
-      const markerColor = crimeColors[crime.crimeType] || "#6b7280";
-      
-      const customIcon = L.divIcon({
-        html: `
-          <div style="
-            width: 32px;
-            height: 32px;
-            background-color: ${markerColor};
-            border: 3px solid white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: white;
-            font-size: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            cursor: pointer;
-          ">${idx + 1}</div>
-        `,
-        iconSize: [32, 32],
-        className: "crime-marker-icon",
-      });
-
-      const marker = L.marker([crime.latitude, crime.longitude], {
-        icon: customIcon,
-      });
-
-      const popupContent = `
-        <div style="font-size: 12px;">
-          <strong>${crime.crimeType}</strong><br/>
-          ${crime.address ? `Location: ${crime.address}<br/>` : ''}
-          ${crime.description ? `Details: ${crime.description.substring(0, 50)}...<br/>` : ''}
-          Reported: ${new Date(crime.reportedAt || '').toLocaleDateString()}
-        </div>
-      `;
-
-      marker.bindPopup(popupContent).addTo(leafletMap);
-    });
-
-    // Fit map bounds to show all markers
-    if (crimes.length > 0) {
-      const group = new (L.FeatureGroup as any)([]);
-      crimes.forEach((crime) => {
-        group.addLayer(
-          L.marker([crime.latitude, crime.longitude])
-        );
-      });
-      group.addLayer(L.marker([location.latitude, location.longitude]));
-      leafletMap.fitBounds(group.getBounds().pad(0.1));
-    }
-
-    // Cleanup on unmount
-    return () => {
-      leafletMap.remove();
-    };
   }, [location, crimes, showHeatmap]);
 
   const getCrimeTypeColor = (type: string) => {
@@ -366,31 +375,13 @@ export default function CrimeMap() {
     return (R * c).toFixed(1);
   };
 
-  if (authLoading || isLoading) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-96">
         <div className="text-center space-y-2">
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-muted-foreground">Loading crime data...</p>
+          <p className="text-sm text-muted-foreground">Authenticating...</p>
         </div>
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="flex items-center justify-center min-h-96">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-3" />
-            <h3 className="text-lg font-semibold mb-2">
-              Failed to Load Crime Data
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Unable to fetch crime reports. Please try again later.
-            </p>
-          </CardContent>
-        </Card>
       </div>
     );
   }
