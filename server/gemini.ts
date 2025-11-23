@@ -6,6 +6,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 export interface CrimeAnalysis {
   analysis: string;
   recommendations: string[];
+  selfDefenseRecommendations: string[];
 }
 
 export async function analyzeCrimePatterns(crimeData: any[]): Promise<CrimeAnalysis> {
@@ -13,6 +14,11 @@ export async function analyzeCrimePatterns(crimeData: any[]): Promise<CrimeAnaly
     return {
       analysis: "No crime data available for analysis",
       recommendations: ["Report crimes in your area to help improve safety insights"],
+      selfDefenseRecommendations: [
+        "Stay alert and aware of your surroundings",
+        "Trust your instincts and avoid suspicious situations",
+        "Keep emergency contacts easily accessible"
+      ],
     };
   }
 
@@ -23,14 +29,15 @@ export async function analyzeCrimePatterns(crimeData: any[]): Promise<CrimeAnaly
       description: c.description?.substring(0, 100),
     }));
 
-    const prompt = `Analyze these crime reports and provide safety insights:
+    const prompt = `Analyze these crime reports and provide safety insights with self-defense recommendations:
 ${JSON.stringify(crimesSummary, null, 2)}
 
 Provide:
 1. A brief analysis of crime patterns (2-3 sentences)
 2. 3-5 safety recommendations
+3. 3-5 specific self-defense recommendations based on the crime types reported (include practical techniques and awareness tips)
 
-Respond in JSON format: {"analysis": "...", "recommendations": ["...", "..."]}`;
+Respond in JSON format: {"analysis": "...", "recommendations": ["...", "..."], "selfDefenseRecommendations": ["...", "..."]}`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -44,8 +51,12 @@ Respond in JSON format: {"analysis": "...", "recommendations": ["...", "..."]}`;
               type: "array",
               items: { type: "string" },
             },
+            selfDefenseRecommendations: {
+              type: "array",
+              items: { type: "string" },
+            },
           },
-          required: ["analysis", "recommendations"],
+          required: ["analysis", "recommendations", "selfDefenseRecommendations"],
         },
       },
       contents: prompt,
@@ -63,6 +74,13 @@ Respond in JSON format: {"analysis": "...", "recommendations": ["...", "..."]}`;
     return {
       analysis: "Unable to analyze crime patterns at this time",
       recommendations: ["Stay aware of your surroundings", "Report suspicious activity"],
+      selfDefenseRecommendations: [
+        "Stay in well-lit, populated areas",
+        "Keep your phone charged with emergency contacts saved",
+        "Trust your instincts - leave situations that feel unsafe",
+        "Take a self-defense class to build confidence",
+        "Practice de-escalation techniques and avoid confrontation"
+      ],
     };
   }
 }

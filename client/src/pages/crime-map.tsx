@@ -39,7 +39,7 @@ export default function CrimeMap() {
     data: aiInsights,
     isLoading: aiLoading,
     isError: aiError,
-  } = useQuery<{ analysis: string; recommendations: string[] }>({
+  } = useQuery<{ analysis: string; recommendations: string[]; selfDefenseRecommendations?: string[] }>({
     queryKey: ["/api/ai/crime-analysis"],
     enabled: isAuthenticated && crimes.length > 0,
   });
@@ -536,6 +536,25 @@ export default function CrimeMap() {
                               className="text-xs text-muted-foreground flex items-start gap-2"
                             >
                               <span className="text-primary mt-0.5">•</span>
+                              <span>{rec}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  {(aiInsights as any).selfDefenseRecommendations &&
+                    (aiInsights as any).selfDefenseRecommendations.length > 0 && (
+                      <div className="border-t pt-3">
+                        <p className="text-sm font-medium mb-2">
+                          Self-Defense Tips
+                        </p>
+                        <ul className="space-y-1">
+                          {(aiInsights as any).selfDefenseRecommendations.map((rec: string, idx: number) => (
+                            <li
+                              key={idx}
+                              className="text-xs text-muted-foreground flex items-start gap-2"
+                            >
+                              <span className="text-chart-5 mt-0.5">•</span>
                               <span>{rec}</span>
                             </li>
                           ))}
