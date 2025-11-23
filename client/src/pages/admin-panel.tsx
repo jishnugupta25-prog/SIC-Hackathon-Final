@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock, X, Navigation } from "lucide-react";
+import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock, X, Navigation, Phone } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -300,10 +300,10 @@ export default function AdminPanel() {
 
       {/* Report Details Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-lg max-h-[95vh] overflow-hidden flex flex-col" data-testid="dialog-report-details">
+        <DialogContent className="max-w-lg h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-report-details">
           {selectedCrime ? (
             <>
-              <DialogHeader className="pb-2">
+              <DialogHeader className="pb-2 flex-shrink-0">
                 <DialogTitle className="text-lg flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
                   {selectedCrime.crimeType}
@@ -321,8 +321,8 @@ export default function AdminPanel() {
                 </DialogDescription>
               </DialogHeader>
 
-              <ScrollArea className="flex-1 overflow-hidden">
-                <div className="pr-4 space-y-2">
+              <ScrollArea className="flex-1 overflow-y-auto">
+                <div className="pr-4 space-y-2 pb-4">
                   {/* Quick Status & Action */}
                   <div className="flex items-center justify-between bg-muted/50 p-2 rounded-lg">
                     <Badge
@@ -366,7 +366,7 @@ export default function AdminPanel() {
 
                   {/* Reporter Info - Compact */}
                   {(selectedCrime as any).reporter && (
-                    <div className="bg-secondary/30 p-2 rounded text-xs space-y-1">
+                    <div className="bg-secondary/30 p-2 rounded text-xs space-y-2">
                       {selectedCrime.isAnonymous ? (
                         <p className="font-semibold">Anonymous User</p>
                       ) : (
@@ -374,7 +374,20 @@ export default function AdminPanel() {
                           <p className="font-semibold">{(selectedCrime as any).reporter.firstName} {(selectedCrime as any).reporter.lastName}</p>
                           <p className="text-muted-foreground break-all">{(selectedCrime as any).reporter.email}</p>
                           {selectedCrime.phoneNumber && (
-                            <p className="text-muted-foreground break-all font-mono">{selectedCrime.phoneNumber}</p>
+                            <div className="space-y-1">
+                              <p className="text-muted-foreground break-all font-mono">{selectedCrime.phoneNumber}</p>
+                              <Button
+                                onClick={() => {
+                                  window.location.href = `tel:${selectedCrime.phoneNumber}`;
+                                }}
+                                variant="outline"
+                                className="w-full h-7 text-xs"
+                                data-testid="button-call-user"
+                              >
+                                <Phone className="h-3 w-3 mr-1" />
+                                Call User
+                              </Button>
+                            </div>
                           )}
                         </>
                       )}
