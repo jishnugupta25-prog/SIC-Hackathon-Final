@@ -20,6 +20,8 @@ interface SafeRoute {
   coordinates: [number, number][];
   color: string;
   recommendation: string;
+  startCoords?: { lat: number; lon: number };
+  endCoords?: { lat: number; lon: number };
 }
 
 interface LocationSuggestion {
@@ -340,11 +342,23 @@ export default function SafeRoutes() {
     setShowRouteModal(true);
   };
 
-  // Open Google Maps directions
+  // Open Google Maps directions with selected route coordinates
   const handleGetDirections = () => {
-    if (!startCoords || !endCoords) return;
+    if (!selectedRoute) return;
 
-    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${startCoords.latitude},${startCoords.longitude}&destination=${endCoords.latitude},${endCoords.longitude}&travelmode=driving`;
+    let origin = startCoords;
+    let destination = endCoords;
+
+    if (selectedRoute.startCoords) {
+      origin = { latitude: selectedRoute.startCoords.lat, longitude: selectedRoute.startCoords.lon };
+    }
+    if (selectedRoute.endCoords) {
+      destination = { latitude: selectedRoute.endCoords.lat, longitude: selectedRoute.endCoords.lon };
+    }
+
+    if (!origin || !destination) return;
+
+    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&travelmode=driving`;
     window.open(googleMapsUrl, "_blank");
   };
 
@@ -370,8 +384,8 @@ export default function SafeRoutes() {
       }).addTo(map);
 
       // Draw route
-      const latlngs = selectedRoute.coordinates.map((coord) => [coord[0], coord[1]]);
-      L.polyline(latlngs, {
+      const latlngs = selectedRoute.coordinates.map((coord) => [coord[0], coord[1]] as [number, number]);
+      L.polyline(latlngs as L.LatLngExpression[], {
         color: selectedRoute.color,
         weight: 4,
         opacity: 0.8,

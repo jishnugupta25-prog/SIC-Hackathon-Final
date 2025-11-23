@@ -1492,7 +1492,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('Content-Type', 'application/json');
     try {
       console.log("[Safe Routes API] Request received:", req.body);
-      const { startLocation, endLocation, userLocation } = req.body;
+      const { startLocation, endLocation, userLocation, startCoords, endCoords } = req.body;
 
       if (!startLocation || !endLocation) {
         console.log("[Safe Routes API] Missing locations");
@@ -1508,17 +1508,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("[Safe Routes API] Database error:", dbError);
       }
 
-      // Parse location coordinates
-      const startCoords = { 
-        lat: userLocation?.latitude || 22.7700, 
-        lon: userLocation?.longitude || 88.3786 
+      // Use actual coordinates from user selection or fallback
+      const start = { 
+        lat: startCoords?.latitude || userLocation?.latitude || 22.7700, 
+        lon: startCoords?.longitude || userLocation?.longitude || 88.3786 
       };
-      const endCoords = { 
-        lat: (userLocation?.latitude || 22.7700) + 0.05, 
-        lon: (userLocation?.longitude || 88.3786) + 0.05 
+      const end = { 
+        lat: endCoords?.latitude || 22.82, 
+        lon: endCoords?.longitude || 88.42 
       };
 
-      console.log("[Safe Routes API] Start:", startCoords, "End:", endCoords);
+      console.log("[Safe Routes API] Start:", start, "End:", end);
+
+      // Calculate base distance
+      const baseDistance = calculateDistance(start.lat, start.lon, end.lat, end.lon);
+      const baseDuration = Math.round(baseDistance * 2.5); // Rough estimate: 2.5 min per km
 
       // Calculate crime density in grid cells
       const gridSize = 0.01;
@@ -1538,33 +1542,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           id: "safest",
           name: "Safest Route",
-          distance: 12.5,
-          duration: 28,
+          distance: baseDistance * 1.15, // 15% longer for safety
+          duration: Math.round(baseDuration * 1.15),
           crimeCount: 0,
           safetyScore: 1.0,
-          coordinates: generateRoutePath(startCoords, endCoords, "safest"),
+          startCoords: start,
+          endCoords: end,
+          coordinates: generateRoutePath(start, end, "safest"),
           color: "#22c55e",
           recommendation: "Optimized for maximum safety - avoids all known crime hotspots",
         },
         {
           id: "balanced",
           name: "Balanced Route",
-          distance: 10.2,
-          duration: 22,
+          distance: baseDistance * 1.05, // 5% longer for balance
+          duration: Math.round(baseDuration * 1.05),
           crimeCount: 1,
           safetyScore: 0.75,
-          coordinates: generateRoutePath(startCoords, endCoords, "balanced"),
+          startCoords: start,
+          endCoords: end,
+          coordinates: generateRoutePath(start, end, "balanced"),
           color: "#f59e0b",
           recommendation: "Balances safety and travel time - minor crime presence",
         },
         {
           id: "fastest",
           name: "Fastest Route",
-          distance: 8.7,
-          duration: 18,
+          distance: baseDistance,
+          duration: baseDuration,
           crimeCount: 3,
           safetyScore: 0.5,
-          coordinates: generateRoutePath(startCoords, endCoords, "fastest"),
+          startCoords: start,
+          endCoords: end,
+          coordinates: generateRoutePath(start, end, "fastest"),
           color: "#ef4444",
           recommendation: "Quickest route - passes through some moderate-risk areas",
         },
