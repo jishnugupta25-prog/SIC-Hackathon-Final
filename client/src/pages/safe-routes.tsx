@@ -134,15 +134,27 @@ export default function SafeRoutes() {
     };
   }, []);
 
-  // Search locations using Nominatim (OpenStreetMap) - Priority to Indian locations
+  // Search locations using Nominatim with user location context
   const searchLocations = async (query: string): Promise<LocationSuggestion[]> => {
     if (!query || query.length < 2) return [];
 
     try {
-      // Search with India country code first for priority
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycode=in&format=json&limit=20&addressdetails=1`
-      );
+      // Build URL with user's location as viewbox for biased results
+      let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=30&addressdetails=1`;
+      
+      // If user location available, use it to bias search results
+      if (location) {
+        // Create a viewbox around user's current location (bias search to nearby areas)
+        const latOffset = 2; // ~220km radius
+        const lonOffset = 2;
+        const viewbox = `${location.longitude - lonOffset},${location.latitude - latOffset},${location.longitude + lonOffset},${location.latitude + latOffset}`;
+        url += `&viewbox=${viewbox}&bounded=0`;
+      } else {
+        // Default to India region if no user location
+        url += `&viewbox=68.1,8.0,97.4,35.5&bounded=0`;
+      }
+      
+      const response = await fetch(url);
       const data = await response.json();
       
       return data.map((item: any) => ({
