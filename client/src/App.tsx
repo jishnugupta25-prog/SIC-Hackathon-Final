@@ -65,6 +65,7 @@ function AppLayout() {
         <Route path="/signup" component={Signup} />
         <Route path="/login" component={Login} />
         <Route path="/admin-login" component={AdminLogin} />
+        <Route path="/admin-panel" component={AdminPanel} />
         <Route component={Landing} />
       </Switch>
     );
