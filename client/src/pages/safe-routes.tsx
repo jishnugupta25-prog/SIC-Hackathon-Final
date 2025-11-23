@@ -376,47 +376,31 @@ export default function SafeRoutes() {
       }
       container.innerHTML = "";
 
-      const map = L.map(container).setView([location.latitude, location.longitude], 13);
+      const map = L.map(container, { 
+        zoomControl: false,
+        attributionControl: false,
+        dragging: true,
+        scrollWheelZoom: false
+      }).setView([location.latitude, location.longitude], 12);
 
+      // Use faster tile layer with lower max zoom
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
-        maxZoom: 19,
+        maxZoom: 16,
       }).addTo(map);
 
-      // Draw route
+      // Draw route - simplified polyline without complex styling
       const latlngs = selectedRoute.coordinates.map((coord) => [coord[0], coord[1]] as [number, number]);
       L.polyline(latlngs as L.LatLngExpression[], {
         color: selectedRoute.color,
-        weight: 4,
-        opacity: 0.8,
-        dashArray: selectedRoute.crimeCount > 0 ? "5, 5" : undefined,
+        weight: 3,
+        opacity: 0.9,
       }).addTo(map);
 
-      // Start marker
-      L.circleMarker([latlngs[0][0], latlngs[0][1]], {
-        radius: 8,
-        fillColor: "#22c55e",
-        color: "#16a34a",
-        weight: 3,
-        opacity: 1,
-        fillOpacity: 0.8,
-      })
-        .bindPopup("Start")
-        .addTo(map);
+      // Simple markers instead of circle markers
+      L.marker([latlngs[0][0], latlngs[0][1]]).addTo(map);
+      L.marker([latlngs[latlngs.length - 1][0], latlngs[latlngs.length - 1][1]]).addTo(map);
 
-      // End marker
-      L.circleMarker([latlngs[latlngs.length - 1][0], latlngs[latlngs.length - 1][1]], {
-        radius: 8,
-        fillColor: "#ef4444",
-        color: "#dc2626",
-        weight: 3,
-        opacity: 1,
-        fillOpacity: 0.8,
-      })
-        .bindPopup("End")
-        .addTo(map);
-
-      // Calculate center and zoom for faster rendering
+      // Direct setView without fitBounds
       const centerLat = (latlngs[0][0] + latlngs[latlngs.length - 1][0]) / 2;
       const centerLon = (latlngs[0][1] + latlngs[latlngs.length - 1][1]) / 2;
       map.setView([centerLat, centerLon], 12);

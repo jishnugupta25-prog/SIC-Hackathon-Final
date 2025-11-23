@@ -1609,20 +1609,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     routeType: string
   ): [number, number][] {
     const points: [number, number][] = [];
-    const steps = 6; // Reduced from 10 for faster rendering
+    const steps = 4; // Minimal steps for ultra-fast rendering
 
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       let lat = start.lat + (end.lat - start.lat) * t;
       let lon = start.lon + (end.lon - start.lon) * t;
 
-      // Add variation based on route type
+      // Minimal variation
       if (routeType === "safest") {
-        // Route slightly north (assumed safer)
-        lat += Math.sin(t * Math.PI) * 0.015; // Reduced variation
+        lat += Math.sin(t * Math.PI) * 0.01;
       } else if (routeType === "fastest") {
-        // Direct route with slight variations
-        lon += Math.sin(t * Math.PI) * 0.008; // Reduced variation
+        lon += Math.sin(t * Math.PI) * 0.005;
       }
 
       points.push([lat, lon]);
