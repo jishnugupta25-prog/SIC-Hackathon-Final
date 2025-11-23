@@ -965,7 +965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Safe Places] Fetching REAL-TIME nearby safe places for ANY location: ${userLat}, ${userLon}`);
 
-      const radius = 50; // 50km search radius - show all nearby safe places
+      const radius = 100; // 100km search radius - show all nearby safe places (can include 100+ results)
       const radiusMeters = radius * 1000;
       const allPlaces: any[] = [];
       const seenPlaces = new Set<string>();
