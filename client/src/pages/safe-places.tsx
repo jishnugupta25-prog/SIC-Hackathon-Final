@@ -160,7 +160,7 @@ export default function SafePlaces() {
   const requestLocationFn = () => {
     const options = {
       enableHighAccuracy: true,
-      timeout: 10000,
+      timeout: 20000,
       maximumAge: 0,
     };
 

@@ -77,7 +77,7 @@ export default function SafeRoutes() {
     let bestPosition: { latitude: number; longitude: number } | null = null;
     let timeoutId: NodeJS.Timeout;
 
-    const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+    const options = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
 
     console.log("[Safe Routes GPS] Requesting location...");
 
