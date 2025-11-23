@@ -18,25 +18,25 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-**November 23, 2025 - Safe Places Progressive Distance Search:**
-- Implemented progressive distance-based safe places discovery (100m to 20km)
-  - Displays all safe places starting from 10m away up to 20km radius
-  - Meter-level accuracy: shows "10m away", "250m away", etc. for close places
-  - Shows kilometers for far places: "1.45km away", "8.82km away", etc.
-  - Real, verified place names and phone numbers organized by distance
-  - 38 safe places across Barrackpore/Barasat region with progressive coverage
-  - Includes hospitals, police stations, and pharmacies
-  - All places sorted by proximity to user's current location
-  - Supports filtering by type (All/Hospitals/Police/Pharmacy)
-  - Data persists from hardcoded database + Overpass API fallback
+**November 23, 2025 - Deployment-Ready Fixes & Persistent Authentication:**
+- ✅ Fixed crime map deployment errors with try-catch error handling
+- ✅ Removed premature error screens for graceful degradation
+- ✅ Increased file upload limit to 2GB for large media evidence
+- ✅ Fixed duplicate React keys (removed duplicate "Stalking" crime type)
+- ✅ Verified persistent authentication system for production:
+  - Users can sign up with email/password (stored securely with bcrypt hashing)
+  - Sessions persist in PostgreSQL with 7-day TTL
+  - Login works from any device, any time with saved credentials
+  - No need to create account every time - system remembers everything
+  - All data persists permanently in database
+- ✅ All three major features tested and working:
+  1. Crime heatmap with color-coded danger zones (yellow→orange→red)
+  2. Evidence upload up to 2GB (images, videos, voice messages)
+  3. Admin panel with complete media review dashboard
 
-**November 23, 2025 (Earlier):**
+**Previous Session:**
+- Implemented progressive distance-based safe places discovery (100m to 20km)
 - Merged admin login with main user login page
-  - Added "System Admin Login" button on `/login` page for convenience
-  - Admins no longer need to navigate to separate `/admin-login` URL
-  - Single unified login page with toggle between user and admin modes
-  - Both authentication flows fully functional and tested
-  - Fixed admin session persistence by adding `credentials: "include"` to fetch requests
 
 ## System Architecture
 
