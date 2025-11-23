@@ -184,6 +184,7 @@ export default function ReportCrime() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crimes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crimes/recent"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/crimes"] });
       setReferenceNumber(data.referenceNumber);
       setIsSuccess(true);
       toast({
@@ -282,16 +283,16 @@ export default function ReportCrime() {
           <CardContent className="flex flex-col items-center justify-center py-16">
             <CheckCircle className="h-16 w-16 text-chart-4 mb-4" />
             <h2 className="text-2xl font-heading font-bold mb-2">Report Submitted</h2>
-            <p className="text-muted-foreground text-center mb-6">
-              Thank you for reporting. Your submission helps keep the community safe.
-            </p>
             {referenceNumber && (
-              <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 mb-6 w-full">
-                <p className="text-sm text-muted-foreground text-center">Your Reference Number is -</p>
-                <p className="text-2xl font-heading font-bold text-center text-primary">{referenceNumber}</p>
-                <p className="text-xs text-muted-foreground text-center mt-2">Save this for your records</p>
+              <div className="mb-6">
+                <p className="text-sm text-muted-foreground text-center mb-2">Your Reference Number is -</p>
+                <p className="text-3xl font-heading font-bold text-center text-primary font-mono">{referenceNumber}</p>
+                <p className="text-xs text-muted-foreground text-center mt-3">Save this for your records</p>
               </div>
             )}
+            <p className="text-muted-foreground text-center mb-6 max-w-sm">
+              Thank you for reporting. Your submission helps keep the community safe.
+            </p>
             <div className="flex gap-3">
               <Button onClick={() => setIsSuccess(false)} data-testid="button-report-another">
                 Report Another Crime
