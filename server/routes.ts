@@ -1602,14 +1602,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Helper function to generate route paths
+  // Helper function to generate route paths (optimized for fast rendering)
   function generateRoutePath(
     start: { lat: number; lon: number },
     end: { lat: number; lon: number },
     routeType: string
   ): [number, number][] {
     const points: [number, number][] = [];
-    const steps = 10;
+    const steps = 6; // Reduced from 10 for faster rendering
 
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
@@ -1619,10 +1619,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add variation based on route type
       if (routeType === "safest") {
         // Route slightly north (assumed safer)
-        lat += Math.sin(t * Math.PI) * 0.02;
+        lat += Math.sin(t * Math.PI) * 0.015; // Reduced variation
       } else if (routeType === "fastest") {
         // Direct route with slight variations
-        lon += Math.sin(t * Math.PI) * 0.01;
+        lon += Math.sin(t * Math.PI) * 0.008; // Reduced variation
       }
 
       points.push([lat, lon]);

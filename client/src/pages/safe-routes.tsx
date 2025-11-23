@@ -416,12 +416,10 @@ export default function SafeRoutes() {
         .bindPopup("End")
         .addTo(map);
 
-      // Fit bounds
-      const group = new (L.FeatureGroup as any)([]);
-      latlngs.forEach((coord: any) => {
-        group.addLayer(L.marker(coord));
-      });
-      map.fitBounds(group.getBounds().pad(0.1));
+      // Calculate center and zoom for faster rendering
+      const centerLat = (latlngs[0][0] + latlngs[latlngs.length - 1][0]) / 2;
+      const centerLon = (latlngs[0][1] + latlngs[latlngs.length - 1][1]) / 2;
+      map.setView([centerLat, centerLon], 12);
 
       return () => {
         try {
@@ -695,7 +693,7 @@ export default function SafeRoutes() {
               <div
                 id="route-modal-map"
                 className="bg-muted rounded-md w-full"
-                style={{ height: "350px", minHeight: "350px" }}
+                style={{ height: "220px", minHeight: "220px" }}
               />
 
               {/* Route Details */}
