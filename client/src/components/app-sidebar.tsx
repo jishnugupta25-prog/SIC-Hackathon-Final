@@ -1,4 +1,4 @@
-import { Home, Map, AlertTriangle, Shield, Users, LogOut, BarChart3 } from "lucide-react";
+import { Home, Map, AlertTriangle, Shield, Users, LogOut } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -49,14 +49,6 @@ const menuItems = [
   },
 ];
 
-const adminItems = [
-  {
-    title: "Admin Dashboard",
-    url: "/admin",
-    icon: BarChart3,
-  },
-];
-
 export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
@@ -82,26 +74,6 @@ export function AppSidebar() {
           <SidebarGroupContent className="px-3">
             <SidebarMenu className="space-y-2">
               {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`} className={`px-4 py-3 rounded-lg transition-all ${location === item.url ? 'bg-primary/15 text-primary font-semibold' : 'hover:bg-primary/5'}`}>
-                    <Link href={item.url}>
-                      <item.icon className="h-5 w-5" />
-                      <span className="font-medium">{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarSeparator className="my-2" />
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Admin</SidebarGroupLabel>
-          <SidebarGroupContent className="px-3">
-            <SidebarMenu className="space-y-2">
-              {adminItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location === item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`} className={`px-4 py-3 rounded-lg transition-all ${location === item.url ? 'bg-primary/15 text-primary font-semibold' : 'hover:bg-primary/5'}`}>
                     <Link href={item.url}>
