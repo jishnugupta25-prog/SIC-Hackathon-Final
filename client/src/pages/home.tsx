@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -25,6 +26,7 @@ import {
 export default function Home() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const [, setNavigateLocation] = useLocation();
   const [sosActive, setSosActive] = useState(false);
   const [sosCounter, setSosCounter] = useState(0);
   const [showSosConfirm, setShowSosConfirm] = useState(false);
@@ -74,46 +76,7 @@ export default function Home() {
     refetchInterval: 5000, // Poll for new messages
   });
 
-  // SOS Alert mutation
-  const sosMutation = useMutation({
-    mutationFn: async () => {
-      if (!location) {
-        throw new Error("Location not available");
-      }
-      return await apiRequest("POST", "/api/sos", {
-        latitude: location.latitude,
-        longitude: location.longitude,
-      });
-    },
-    onSuccess: () => {
-      toast({
-        title: "SOS Alert Sent!",
-        description: `Emergency message sent to ${contacts.length} contact${contacts.length !== 1 ? 's' : ''}`,
-      });
-      setSosActive(false);
-      setSosCounter(0);
-      setShowSosConfirm(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/sos-history"] });
-    },
-    onError: (error: Error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "SOS Failed",
-        description: error.message || "Failed to send SOS alert",
-        variant: "destructive",
-      });
-    },
-  });
+  // Removed SOS Alert mutation - now handled in SOS messaging page
 
   // Get current location with fallback
   useEffect(() => {
@@ -246,7 +209,10 @@ export default function Home() {
   };
 
   const confirmSos = () => {
-    sosMutation.mutate();
+    setSosActive(false);
+    setSosCounter(0);
+    setShowSosConfirm(false);
+    setNavigateLocation("/sos-messaging");
   };
 
   if (authLoading) {
@@ -361,7 +327,7 @@ export default function Home() {
         <CardContent className="flex flex-col items-center gap-4 pt-4">
           <button
             onClick={handleSosClick}
-            disabled={sosMutation.isPending || contacts.length === 0}
+            disabled={contacts.length === 0}
             className={`
               h-32 w-32 rounded-full flex items-center justify-center
               transition-all duration-200 cursor-pointer
@@ -456,8 +422,7 @@ export default function Home() {
           <AlertDialogHeader>
             <AlertDialogTitle>Send Emergency Alert?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will send your current location to {contacts.length} emergency contact{contacts.length !== 1 ? 's' : ''} via SMS.
-              They will receive: "User {user?.firstName || user?.email} needs urgent help!"
+              You will be taken to a messaging screen where you can select which contacts receive your SOS alert with your location. Message: "I am in danger save me!!"
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -465,7 +430,7 @@ export default function Home() {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction onClick={confirmSos} className="bg-destructive hover:bg-destructive/90" data-testid="button-confirm-sos">
-              Send SOS Alert
+              Go to Messaging
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
