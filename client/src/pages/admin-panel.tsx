@@ -38,11 +38,40 @@ export default function AdminPanel() {
   const [selectedCrimeId, setSelectedCrimeId] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean | null>(null);
+
+  // Check if admin is authenticated on component mount
+  useEffect(() => {
+    const checkAdminAuth = async () => {
+      try {
+        const response = await fetch("/api/admin/crimes", {
+          credentials: "include",
+        });
+        if (response.ok) {
+          setIsAdminAuthenticated(true);
+        } else {
+          setIsAdminAuthenticated(false);
+          setTimeout(() => {
+            setLocation("/login");
+          }, 500);
+        }
+      } catch (error) {
+        console.error("Admin auth check failed:", error);
+        setIsAdminAuthenticated(false);
+        setTimeout(() => {
+          setLocation("/login");
+        }, 500);
+      }
+    };
+
+    checkAdminAuth();
+  }, [setLocation]);
 
   // Fetch crimes for review
   const { data: crimesData, isLoading } = useQuery({
     queryKey: ["/api/admin/crimes"],
     refetchInterval: 3000, // Refresh every 3 seconds
+    enabled: isAdminAuthenticated === true, // Only fetch if authenticated
   });
 
   const crimes: CrimeForReview[] = Array.isArray(crimesData) ? crimesData : [];
@@ -84,8 +113,8 @@ export default function AdminPanel() {
   });
 
   const handleLogout = async () => {
-    await fetch("/api/admin/logout", { method: "GET" });
-    setLocation("/admin-login");
+    await fetch("/api/admin/logout", { method: "GET", credentials: "include" });
+    setLocation("/login");
   };
 
   const handleSendFeedback = async () => {
@@ -101,6 +130,38 @@ export default function AdminPanel() {
   const pendingCrimes = crimes.filter((c) => !c.approval || c.approval.status === "pending");
   const approvedCrimes = crimes.filter((c) => c.approval?.status === "approved");
   const rejectedCrimes = crimes.filter((c) => c.approval?.status === "rejected");
+
+  // Show loading state while checking admin authentication
+  if (isAdminAuthenticated === null) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-2">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-muted-foreground">Verifying admin access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if not authenticated
+  if (isAdminAuthenticated === false) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md p-6">
+          <div className="text-center space-y-4">
+            <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
+            <h2 className="text-lg font-semibold">Access Denied</h2>
+            <p className="text-sm text-muted-foreground">
+              Admin authentication failed. Please log in again.
+            </p>
+            <Button onClick={() => setLocation("/login")}>
+              Return to Login
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
