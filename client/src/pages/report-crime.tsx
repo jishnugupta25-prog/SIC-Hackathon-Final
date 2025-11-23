@@ -394,16 +394,28 @@ export default function ReportCrime() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Phone Number *</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Enter your phone number (e.g., +1-555-123-4567)"
-                            {...field}
-                            value={field.value || ""}
-                            data-testid="input-phone-number"
-                          />
-                        </FormControl>
+                        <div className="flex gap-2">
+                          <div className="flex items-center bg-muted px-3 rounded-md border border-input text-sm font-medium text-muted-foreground">
+                            +91
+                          </div>
+                          <FormControl>
+                            <Input
+                              placeholder="Enter 10-digit number (e.g., 9876543210)"
+                              {...field}
+                              value={field.value?.replace("+91", "") || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                // Only store digits, but allow display of the value
+                                field.onChange(`+91${val}`);
+                              }}
+                              maxLength={10}
+                              pattern="[0-9]*"
+                              data-testid="input-phone-number"
+                            />
+                          </FormControl>
+                        </div>
                         <FormDescription>
-                          Required for contact purposes
+                          Indian phone number required (10 digits)
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
