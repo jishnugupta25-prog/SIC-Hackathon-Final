@@ -355,6 +355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
       });
       const crime = await storage.createCrimeReport(crimeData);
+      console.log("Crime created with data:", crime);
       res.json(crime);
     } catch (error: any) {
       console.error("Error creating crime report:", error);

@@ -175,6 +175,12 @@ export class DatabaseStorage implements IStorage {
       .insert(crimeReports)
       .values({ ...report, id: randomUUID(), referenceNumber, createdAt: now, reportedAt: now })
       .returning();
+    
+    // Ensure referenceNumber is included in the response
+    if (newReport && !newReport.referenceNumber) {
+      newReport.referenceNumber = referenceNumber;
+    }
+    
     return newReport;
   }
 

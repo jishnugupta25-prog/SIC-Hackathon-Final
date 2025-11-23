@@ -182,10 +182,13 @@ export default function ReportCrime() {
       return await apiRequest("POST", "/api/crimes", data);
     },
     onSuccess: (data: any) => {
+      console.log("Crime submitted response:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/crimes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crimes/recent"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/crimes"] });
-      setReferenceNumber(data.referenceNumber);
+      const refNum = data?.referenceNumber || data?.reference_number;
+      console.log("Reference number extracted:", refNum);
+      setReferenceNumber(refNum);
       setIsSuccess(true);
       toast({
         title: "Crime Reported",
