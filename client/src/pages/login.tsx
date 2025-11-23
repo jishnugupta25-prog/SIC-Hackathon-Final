@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Shield, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient } from '@/lib/queryClient';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 type LoginMode = 'user' | 'admin';
 
@@ -114,6 +115,9 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <Card className="w-full max-w-md p-6 space-y-6">
         <div className="flex items-center gap-2 justify-center">
           <Shield className="h-6 w-6 text-primary" />
