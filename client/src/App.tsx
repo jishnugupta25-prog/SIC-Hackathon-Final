@@ -18,6 +18,7 @@ import Contacts from "@/pages/contacts";
 import CrimeMap from "@/pages/crime-map";
 import ReportCrime from "@/pages/report-crime";
 import SafePlaces from "@/pages/safe-places";
+import SafeRoutes from "@/pages/safe-routes";
 import AdminLogin from "@/pages/admin-login";
 import AdminPanel from "@/pages/admin-panel";
 import Signup from "@/pages/signup";
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/crime-map" component={CrimeMap} />
       <Route path="/report-crime" component={ReportCrime} />
       <Route path="/safe-places" component={SafePlaces} />
+      <Route path="/safe-routes" component={SafeRoutes} />
       <Route path="/my-reports" component={MyCrimeReports} />
       <Route path="/sos-messaging" component={SosMessaging} />
       <Route path="/admin-login" component={AdminLogin} />

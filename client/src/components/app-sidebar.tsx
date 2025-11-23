@@ -1,4 +1,4 @@
-import { Home, Map, AlertTriangle, Shield, Users, LogOut } from "lucide-react";
+import { Home, Map, AlertTriangle, Shield, Users, LogOut, Navigation } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -36,6 +36,11 @@ const menuItems = [
     title: "Safe Places",
     url: "/safe-places",
     icon: Shield,
+  },
+  {
+    title: "Safe Routes",
+    url: "/safe-routes",
+    icon: Navigation,
   },
   {
     title: "My Reports",
