@@ -848,6 +848,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user tracking data with crime counts
+  app.get('/api/admin/users-tracking', isAuthenticated, async (req: any, res) => {
+    try {
+      const db = await (await import('./db')).getDb();
+      const { users: usersTable, crimeReports: crimeReportsTable, sessions: sessionsTable } = await import('@shared/schema');
+      const { eq, desc, sql } = await import('drizzle-orm');
+      
+      // Get all users with their crime count and session data
+      const usersWithCounts = await db
+        .select({
+          userId: usersTable.id,
+          email: usersTable.email,
+          firstName: usersTable.firstName,
+          lastName: usersTable.lastName,
+          crimeCount: sql<number>`count(${crimeReportsTable.id})`,
+          createdAt: usersTable.createdAt,
+          updatedAt: usersTable.updatedAt,
+        })
+        .from(usersTable)
+        .leftJoin(crimeReportsTable, eq(usersTable.id, crimeReportsTable.userId))
+        .groupBy(usersTable.id)
+        .orderBy(desc(sql<number>`count(${crimeReportsTable.id})`));
+      
+      // Get active sessions
+      const sessionList = await db.select().from(sessionsTable);
+      const activeUserIds = new Set<string>();
+      
+      for (const session of sessionList) {
+        try {
+          const sess = session.sess as any;
+          if (sess && sess.passport && sess.passport.user) {
+            const userId = sess.passport.user.claims?.sub || sess.passport.user.id;
+            if (userId) {
+              activeUserIds.add(userId);
+            }
+          }
+        } catch (e) {
+          console.warn("Error processing session:", e);
+        }
+      }
+      
+      // Add isActive flag to each user
+      const usersWithStatus = usersWithCounts.map((user: any) => ({
+        ...user,
+        isActive: activeUserIds.has(user.userId),
+        crimeCount: Number(user.crimeCount) || 0,
+      }));
+      
+      res.json(usersWithStatus);
+    } catch (error) {
+      console.error("Error fetching user tracking data:", error);
+      res.status(500).json({ message: "Failed to fetch user tracking data" });
+    }
+  });
+
   app.get('/api/admin/reports', isAuthenticated, async (req: any, res) => {
     try {
       const db = await (await import('./db')).getDb();
