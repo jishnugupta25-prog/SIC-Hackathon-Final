@@ -7,8 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertTriangle, MapPin, Route, Shield, Navigation, Zap, Locate, Search, X, MapIcon } from "lucide-react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 
 interface SafeRoute {
   id: string;
@@ -362,60 +360,98 @@ export default function SafeRoutes() {
     window.open(googleMapsUrl, "_blank");
   };
 
-  // Initialize route map in modal
+  // Initialize route map in modal (SVG-based for fast rendering)
   useEffect(() => {
     if (!showRouteModal || !selectedRoute) return;
 
     try {
       const container = document.getElementById("route-modal-map");
-      if (!container || !location) return;
-
-      const existingLeafletId = (container as any)._leaflet_id;
-      if (existingLeafletId) {
-        delete (container as any)._leaflet_id;
+      if (!container) {
+        console.error("Map container not found");
+        return;
       }
+
+      // Clear container
       container.innerHTML = "";
 
-      const map = L.map(container, { 
-        zoomControl: false,
-        attributionControl: false,
-        dragging: true,
-        scrollWheelZoom: false
-      }).setView([location.latitude, location.longitude], 12);
+      // Create SVG for fast rendering
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("width", "100%");
+      svg.setAttribute("height", "100%");
+      svg.setAttribute("viewBox", "0 0 400 220");
+      svg.style.backgroundColor = "#f5f5f5";
 
-      // Use faster tile layer with lower max zoom
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 16,
-      }).addTo(map);
+      // Calculate bounds
+      const coords = selectedRoute.coordinates;
+      if (coords.length === 0) return;
 
-      // Draw route - simplified polyline without complex styling
-      const latlngs = selectedRoute.coordinates.map((coord) => [coord[0], coord[1]] as [number, number]);
-      L.polyline(latlngs as L.LatLngExpression[], {
-        color: selectedRoute.color,
-        weight: 3,
-        opacity: 0.9,
-      }).addTo(map);
+      let minLat = coords[0][0];
+      let maxLat = coords[0][0];
+      let minLon = coords[0][1];
+      let maxLon = coords[0][1];
 
-      // Simple markers instead of circle markers
-      L.marker([latlngs[0][0], latlngs[0][1]]).addTo(map);
-      L.marker([latlngs[latlngs.length - 1][0], latlngs[latlngs.length - 1][1]]).addTo(map);
+      coords.forEach((coord) => {
+        minLat = Math.min(minLat, coord[0]);
+        maxLat = Math.max(maxLat, coord[0]);
+        minLon = Math.min(minLon, coord[1]);
+        maxLon = Math.max(maxLon, coord[1]);
+      });
 
-      // Direct setView without fitBounds
-      const centerLat = (latlngs[0][0] + latlngs[latlngs.length - 1][0]) / 2;
-      const centerLon = (latlngs[0][1] + latlngs[latlngs.length - 1][1]) / 2;
-      map.setView([centerLat, centerLon], 12);
+      const latRange = maxLat - minLat || 0.01;
+      const lonRange = maxLon - minLon || 0.01;
+      const padding = 20;
+      const width = 400 - padding * 2;
+      const height = 220 - padding * 2;
 
-      return () => {
-        try {
-          map.remove();
-        } catch (e) {
-          console.error("Error cleaning up map:", e);
-        }
+      // Convert lat/lon to SVG coordinates
+      const toSVG = (lat: number, lon: number) => {
+        const x = padding + ((lon - minLon) / lonRange) * width;
+        const y = padding + ((maxLat - lat) / latRange) * height;
+        return [x, y];
       };
+
+      // Draw polyline
+      const pathData = coords.map((coord, i) => {
+        const [x, y] = toSVG(coord[0], coord[1]);
+        return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+      }).join(" ");
+
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", pathData);
+      path.setAttribute("stroke", selectedRoute.color);
+      path.setAttribute("stroke-width", "3");
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+      svg.appendChild(path);
+
+      // Start marker
+      const [startX, startY] = toSVG(coords[0][0], coords[0][1]);
+      const startCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      startCircle.setAttribute("cx", startX.toString());
+      startCircle.setAttribute("cy", startY.toString());
+      startCircle.setAttribute("r", "6");
+      startCircle.setAttribute("fill", "#22c55e");
+      startCircle.setAttribute("stroke", "#16a34a");
+      startCircle.setAttribute("stroke-width", "2");
+      svg.appendChild(startCircle);
+
+      // End marker
+      const [endX, endY] = toSVG(coords[coords.length - 1][0], coords[coords.length - 1][1]);
+      const endCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      endCircle.setAttribute("cx", endX.toString());
+      endCircle.setAttribute("cy", endY.toString());
+      endCircle.setAttribute("r", "6");
+      endCircle.setAttribute("fill", "#ef4444");
+      endCircle.setAttribute("stroke", "#dc2626");
+      endCircle.setAttribute("stroke-width", "2");
+      svg.appendChild(endCircle);
+
+      container.appendChild(svg);
     } catch (error) {
       console.error("Error initializing route map:", error);
     }
-  }, [showRouteModal, selectedRoute, location]);
+  }, [showRouteModal, selectedRoute]);
 
   if (authLoading) {
     return (
