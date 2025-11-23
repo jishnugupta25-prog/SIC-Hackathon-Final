@@ -3,12 +3,13 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useVoiceCommands } from "@/hooks/useVoiceCommands";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, MapPin, Users, Shield, AlertCircle, MessageSquare, AlertOctagon } from "lucide-react";
+import { AlertTriangle, MapPin, Users, Shield, AlertCircle, MessageSquare, AlertOctagon, Mic, MicOff } from "lucide-react";
 import crimeDashboardImg from "@assets/generated_images/crime_dashboard_ui_concept.png";
 import protectionShieldImg from "@assets/generated_images/protection_shield_badge.png";
 import type { EmergencyContact, CrimeReport } from "@shared/schema";
@@ -33,6 +34,51 @@ export default function Home() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [dangerZoneAlert, setDangerZoneAlert] = useState<{ message: string; crimeCount: number } | null>(null);
   const [alertShown, setAlertShown] = useState<string>("");  // Track which hotspots we've alerted about
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+
+  // Voice commands hook for SOS activation
+  const { isListening, toggleListening } = useVoiceCommands({
+    keywords: ["SOS", "emergency", "help", "danger", "mayday"],
+    onCommandDetected: (keyword) => {
+      console.log(`[Voice SOS] Detected: "${keyword}"`);
+      toast({
+        title: "Voice Command Detected",
+        description: `Activating SOS via voice: "${keyword}"`,
+      });
+      // Trigger SOS directly when voice command is detected
+      if (contacts.length === 0) {
+        toast({
+          title: "No Emergency Contacts",
+          description: "Please add emergency contacts before using SOS",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (location) {
+        confirmSosViaVoice();
+      } else {
+        toast({
+          title: "Location Unavailable",
+          description: "Unable to get your current location",
+          variant: "destructive",
+        });
+      }
+    },
+    onListeningStart: () => {
+      console.log('[Voice SOS] Listening started');
+    },
+    onListeningEnd: () => {
+      console.log('[Voice SOS] Listening stopped');
+    },
+    onError: (error) => {
+      console.error('[Voice SOS] Error:', error);
+      toast({
+        title: "Voice Error",
+        description: error,
+        variant: "destructive",
+      });
+    },
+  });
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -53,6 +99,13 @@ export default function Home() {
     queryKey: ["/api/contacts"],
     enabled: isAuthenticated,
   });
+
+  // Handle voice toggle
+  useEffect(() => {
+    if (voiceEnabled) {
+      toggleListening();
+    }
+  }, [voiceEnabled]);
 
   // Calculate safety score based on crime count
   const calculateSafetyScore = (crimeCount: number) => {
@@ -312,11 +365,8 @@ export default function Home() {
     }
   };
 
-  const confirmSos = () => {
-    setSosActive(false);
-    setSosCounter(0);
-    setShowSosConfirm(false);
-
+  // Reusable SOS confirmation logic
+  const executeSos = () => {
     // Open native SMS app with pre-filled recipients and message
     if (!location) {
       toast({
@@ -362,6 +412,21 @@ export default function Home() {
       title: "SOS Activated",
       description: `Opening SMS app to send alert to ${contacts.length} contact${contacts.length !== 1 ? "s" : ""}`,
     });
+  };
+
+  const confirmSos = () => {
+    setSosActive(false);
+    setSosCounter(0);
+    setShowSosConfirm(false);
+    executeSos();
+  };
+
+  const confirmSosViaVoice = () => {
+    setSosActive(false);
+    setSosCounter(0);
+    setShowSosConfirm(false);
+    setVoiceEnabled(false);
+    executeSos();
   };
 
   if (authLoading) {
@@ -504,7 +569,7 @@ export default function Home() {
             Emergency SOS
           </CardTitle>
           <CardDescription>
-            Tap the button twice to send an emergency alert to all your contacts
+            Tap the button twice to send an emergency alert to all your contacts or use voice commands
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center gap-4 pt-4">
@@ -531,6 +596,49 @@ export default function Home() {
             </p>
             {contacts.length === 0 && (
               <p className="text-xs text-destructive mt-1">Add emergency contacts first</p>
+            )}
+          </div>
+
+          {/* Voice Command Toggle */}
+          <div className="w-full border-t pt-4 mt-2">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-sm font-medium">Voice Commands</p>
+                <p className="text-xs text-muted-foreground">Say "SOS", "emergency", "help", "danger", or "mayday"</p>
+              </div>
+              <Button
+                onClick={() => setVoiceEnabled(!voiceEnabled)}
+                variant={voiceEnabled ? "default" : "outline"}
+                size="sm"
+                disabled={contacts.length === 0}
+                className={voiceEnabled ? "bg-chart-5" : ""}
+                data-testid="button-voice-toggle"
+              >
+                {isListening ? (
+                  <>
+                    <MicOff className="h-4 w-4 mr-2" />
+                    Stop Listening
+                  </>
+                ) : voiceEnabled ? (
+                  <>
+                    <Mic className="h-4 w-4 mr-2 animate-pulse" />
+                    Listening...
+                  </>
+                ) : (
+                  <>
+                    <Mic className="h-4 w-4 mr-2" />
+                    Enable Voice
+                  </>
+                )}
+              </Button>
+            </div>
+            {voiceEnabled && isListening && (
+              <div className="mt-3 p-3 bg-chart-5/10 rounded-lg border border-chart-5/30">
+                <p className="text-xs text-muted-foreground flex items-center gap-2">
+                  <span className="inline-block h-2 w-2 bg-chart-5 rounded-full animate-pulse" />
+                  Listening for voice commands...
+                </p>
+              </div>
             )}
           </div>
         </CardContent>
