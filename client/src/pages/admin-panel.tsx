@@ -7,7 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock, X, Navigation, Phone } from "lucide-react";
+import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clock, X, Navigation, Phone, Users, TrendingUp, BarChart3 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -32,6 +40,17 @@ type CrimeForReview = {
   };
 };
 
+type UserTracking = {
+  userId: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  crimeCount: number;
+  createdAt?: string;
+  updatedAt?: string;
+  isActive: boolean;
+};
+
 export default function AdminPanel() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -40,6 +59,7 @@ export default function AdminPanel() {
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Check if admin is authenticated on component mount
   useEffect(() => {
@@ -71,7 +91,7 @@ export default function AdminPanel() {
   // Fetch crimes for review
   const { data: crimesData, isLoading } = useQuery({
     queryKey: ["/api/admin/crimes"],
-    refetchInterval: 3000, // Refresh every 3 seconds
+    refetchInterval: autoRefresh ? 3000 : false, // Refresh every 3 seconds
     enabled: isAdminAuthenticated === true, // Only fetch if authenticated
   });
 
@@ -81,7 +101,15 @@ export default function AdminPanel() {
     enabled: !!selectedCrimeId && isAdminAuthenticated === true,
   });
 
+  // Fetch user tracking data
+  const { data: usersTrackingData, isLoading: usersTrackingLoading } = useQuery({
+    queryKey: ["/api/admin/users-tracking"],
+    refetchInterval: autoRefresh ? 3000 : false, // Refresh every 3 seconds
+    enabled: isAdminAuthenticated === true,
+  });
+
   const crimes: CrimeForReview[] = Array.isArray(crimesData) ? crimesData : [];
+  const usersTracking: UserTracking[] = Array.isArray(usersTrackingData) ? usersTrackingData : [];
   const selectedCrime = crimes.find((c) => c.id === selectedCrimeId);
 
   // Approve crime mutation
@@ -169,6 +197,12 @@ export default function AdminPanel() {
   const approvedCrimes = crimes.filter((c) => c.approval?.status === "approved");
   const rejectedCrimes = crimes.filter((c) => c.approval?.status === "rejected");
 
+  // Calculate user tracking statistics
+  const totalUsers = usersTracking.length;
+  const activeUsers = usersTracking.filter(u => u.isActive).length;
+  const totalCrimes = usersTracking.reduce((sum, u) => sum + u.crimeCount, 0);
+  const averageCrimesPerUser = totalUsers > 0 ? (totalCrimes / totalUsers).toFixed(2) : 0;
+
   // Show loading state while checking admin authentication
   if (isAdminAuthenticated === null) {
     return (
@@ -250,6 +284,169 @@ export default function AdminPanel() {
           </CardContent>
         </Card>
       </div>
+
+      {/* User Tracking Stats */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">User Tracking & Live Data</h2>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/30">
+              <div
+                className={`h-3 w-3 rounded-full ${
+                  autoRefresh ? "bg-green-500 animate-pulse" : "bg-red-500"
+                }`}
+              />
+              <span className="text-sm font-medium">
+                {autoRefresh ? "Live" : "Paused"}
+              </span>
+            </div>
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className="px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium"
+              data-testid="button-toggle-refresh"
+            >
+              {autoRefresh ? "Pause" : "Resume"}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <Users className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalUsers}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Registered in the system
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+              <TrendingUp className="h-4 w-4 text-chart-2" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{activeUsers}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Currently logged in
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Crimes</CardTitle>
+              <BarChart3 className="h-4 w-4 text-chart-1" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalCrimes}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Reported by all users
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Avg Reports/User</CardTitle>
+              <BarChart3 className="h-4 w-4 text-chart-4" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{averageCrimesPerUser}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Average crime reports per user
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* User Tracking Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            All Registered Users
+          </CardTitle>
+          <CardDescription>
+            Complete user data with account information and crime report counts {autoRefresh && "(auto-updating)"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {usersTrackingLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-muted-foreground">Loading user data...</div>
+            </div>
+          ) : usersTracking.length === 0 ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-muted-foreground">No users registered yet</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead className="text-center">Crimes Reported</TableHead>
+                    <TableHead>Member Since</TableHead>
+                    <TableHead className="text-center">Account Created</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {usersTracking.map((user) => (
+                    <TableRow key={user.userId} data-testid={`row-user-${user.userId}`}>
+                      <TableCell className="font-medium">
+                        {user.firstName && user.lastName
+                          ? `${user.firstName} ${user.lastName}`
+                          : user.email.split('@')[0]}
+                      </TableCell>
+                      <TableCell className="text-sm">{user.email}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="font-bold">
+                          {user.crimeCount}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {user.createdAt
+                          ? formatDistanceToNow(new Date(user.createdAt), {
+                              addSuffix: true,
+                            })
+                          : "Unknown"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {user.createdAt
+                          ? new Date(user.createdAt).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : "Unknown"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge
+                          className={
+                            user.isActive
+                              ? "bg-green-500/20 text-green-700 dark:text-green-400"
+                              : "bg-gray-500/20 text-gray-700 dark:text-gray-400"
+                          }
+                        >
+                          {user.isActive ? "Online" : "Offline"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Crime Reports List */}
       <Card>
