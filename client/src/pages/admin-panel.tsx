@@ -11,6 +11,7 @@ import { AlertTriangle, MapPin, LogOut, CheckCircle, XCircle, MessageSquare, Clo
 import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useToast } from "@/hooks/use-toast";
 
 type CrimeForReview = {
   id: string;
@@ -32,6 +33,7 @@ type CrimeForReview = {
 
 export default function AdminPanel() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [selectedCrimeId, setSelectedCrimeId] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackLoading, setFeedbackLoading] = useState(false);
@@ -88,6 +90,11 @@ export default function AdminPanel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/crimes"] });
+      toast({
+        title: "Report Approved",
+        description: "report approved!",
+        duration: 3000,
+      });
       // Don't close modal - user must submit feedback first
     },
   });
@@ -99,6 +106,11 @@ export default function AdminPanel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/crimes"] });
+      toast({
+        title: "Report Rejected",
+        description: "report rejected!",
+        duration: 3000,
+      });
       // Don't close modal - user must submit feedback first
     },
   });
@@ -116,6 +128,11 @@ export default function AdminPanel() {
       setFeedbackMessage("");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/crimes"] });
       queryClient.invalidateQueries({ queryKey: [`/api/admin/crimes/${selectedCrimeId}/feedback`] });
+      toast({
+        title: "Feedback Submitted",
+        description: "feedback submitted!",
+        duration: 3000,
+      });
       // Close modal only after feedback is submitted
       setIsModalOpen(false);
       setSelectedCrimeId(null);
