@@ -199,22 +199,25 @@ export class DatabaseStorage implements IStorage {
     return admin;
   }
 
-  async getCrimesForReview(): Promise<(CrimeReport & { approval: CrimeApproval | null })[]> {
+  async getCrimesForReview(): Promise<(CrimeReport & { approval: CrimeApproval | null; reporter?: User })[]> {
     const db = await getDb();
-    // Get all crimes with their approval status
+    // Get all crimes with their approval status and reporter info
     const crimes = await db
       .select({
         crime: crimeReports,
         approval: crimeApprovals,
+        user: users,
       })
       .from(crimeReports)
       .leftJoin(crimeApprovals, eq(crimeReports.id, crimeApprovals.crimeId))
+      .leftJoin(users, eq(crimeReports.userId, users.id))
       .orderBy(desc(crimeReports.createdAt));
     
     return crimes.map((row: any) => ({
       ...row.crime,
       approval: row.approval,
-    })) as (CrimeReport & { approval: CrimeApproval | null })[];
+      reporter: row.user,
+    })) as (CrimeReport & { approval: CrimeApproval | null; reporter?: User })[];
   }
 
   async approveCrime(crimeId: string, adminId: string): Promise<CrimeApproval> {

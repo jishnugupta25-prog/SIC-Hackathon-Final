@@ -248,6 +248,11 @@ export default function AdminPanel() {
                           <p className="text-xs text-muted-foreground mt-1">
                             {crime.address || `${crime.latitude.toFixed(4)}°, ${crime.longitude.toFixed(4)}°`}
                           </p>
+                          {(crime as any).reporter && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              By: {(crime as any).reporter.firstName} {(crime as any).reporter.lastName}
+                            </p>
+                          )}
                         </div>
                         <Badge
                           className={
@@ -290,6 +295,23 @@ export default function AdminPanel() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {(selectedCrime as any).reporter && (
+                    <>
+                      <div className="bg-secondary/50 p-3 rounded-lg">
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">Reporter Information</p>
+                        <div className="space-y-2">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Name</p>
+                            <p className="text-sm font-semibold">{(selectedCrime as any).reporter.firstName} {(selectedCrime as any).reporter.lastName}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Email</p>
+                            <p className="text-sm">{(selectedCrime as any).reporter.email}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground">Crime Type</p>
                     <p className="text-sm font-semibold mt-1">{selectedCrime.crimeType}</p>
@@ -301,10 +323,12 @@ export default function AdminPanel() {
                     </div>
                   )}
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground">Location</p>
-                    <p className="text-sm mt-1">
-                      {selectedCrime.address || `${selectedCrime.latitude.toFixed(4)}°, ${selectedCrime.longitude.toFixed(4)}°`}
-                    </p>
+                    <p className="text-xs font-semibold text-muted-foreground">Location Address</p>
+                    <p className="text-sm mt-1">{selectedCrime.address || "Not specified"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground">Exact Coordinates</p>
+                    <p className="text-sm mt-1 font-mono text-xs">{selectedCrime.latitude.toFixed(6)}°, {selectedCrime.longitude.toFixed(6)}°</p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground">Status</p>
