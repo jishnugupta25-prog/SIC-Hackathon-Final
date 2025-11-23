@@ -34,10 +34,15 @@ export default function Home() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [dangerZoneAlert, setDangerZoneAlert] = useState<{ message: string; crimeCount: number } | null>(null);
   const [alertShown, setAlertShown] = useState<string>("");  // Track which hotspots we've alerted about
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
 
-  // Voice commands hook for SOS activation
-  const { isListening, toggleListening } = useVoiceCommands({
+  // Fetch emergency contacts
+  const { data: contacts = [] } = useQuery<EmergencyContact[]>({
+    queryKey: ["/api/contacts"],
+    enabled: isAuthenticated,
+  });
+
+  // Voice commands hook for SOS activation - always enabled
+  const { isListening, startListening } = useVoiceCommands({
     keywords: ["SOS", "emergency", "help", "danger", "mayday"],
     onCommandDetected: (keyword) => {
       console.log(`[Voice SOS] Detected: "${keyword}"`);
@@ -72,11 +77,7 @@ export default function Home() {
     },
     onError: (error) => {
       console.error('[Voice SOS] Error:', error);
-      toast({
-        title: "Voice Error",
-        description: error,
-        variant: "destructive",
-      });
+      // Silently fail on error to avoid spam
     },
   });
 
@@ -94,18 +95,12 @@ export default function Home() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
-  // Fetch emergency contacts
-  const { data: contacts = [] } = useQuery<EmergencyContact[]>({
-    queryKey: ["/api/contacts"],
-    enabled: isAuthenticated,
-  });
-
-  // Handle voice toggle
+  // Auto-start voice listening on mount when authenticated
   useEffect(() => {
-    if (voiceEnabled) {
-      toggleListening();
+    if (isAuthenticated && !authLoading) {
+      startListening();
     }
-  }, [voiceEnabled]);
+  }, [isAuthenticated, authLoading]);
 
   // Calculate safety score based on crime count
   const calculateSafetyScore = (crimeCount: number) => {
@@ -425,7 +420,6 @@ export default function Home() {
     setSosActive(false);
     setSosCounter(0);
     setShowSosConfirm(false);
-    setVoiceEnabled(false);
     executeSos();
   };
 
@@ -599,48 +593,18 @@ export default function Home() {
             )}
           </div>
 
-          {/* Voice Command Toggle */}
-          <div className="w-full border-t pt-4 mt-2">
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div>
-                <p className="text-sm font-medium">Voice Commands</p>
-                <p className="text-xs text-muted-foreground">Say "SOS", "emergency", "help", "danger", or "mayday"</p>
+          {/* Voice Command Status */}
+          {isListening && (
+            <div className="w-full border-t pt-4 mt-2">
+              <div className="flex items-center gap-4">
+                <Mic className="h-4 w-4 text-chart-5 animate-pulse flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">Voice Commands Active</p>
+                  <p className="text-xs text-muted-foreground">Say "SOS", "emergency", "help", "danger", or "mayday"</p>
+                </div>
               </div>
-              <Button
-                onClick={() => setVoiceEnabled(!voiceEnabled)}
-                variant={voiceEnabled ? "default" : "outline"}
-                size="sm"
-                disabled={contacts.length === 0}
-                className={voiceEnabled ? "bg-chart-5" : ""}
-                data-testid="button-voice-toggle"
-              >
-                {isListening ? (
-                  <>
-                    <MicOff className="h-4 w-4 mr-2" />
-                    Stop Listening
-                  </>
-                ) : voiceEnabled ? (
-                  <>
-                    <Mic className="h-4 w-4 mr-2 animate-pulse" />
-                    Listening...
-                  </>
-                ) : (
-                  <>
-                    <Mic className="h-4 w-4 mr-2" />
-                    Enable Voice
-                  </>
-                )}
-              </Button>
             </div>
-            {voiceEnabled && isListening && (
-              <div className="mt-3 p-3 bg-chart-5/10 rounded-lg border border-chart-5/30">
-                <p className="text-xs text-muted-foreground flex items-center gap-2">
-                  <span className="inline-block h-2 w-2 bg-chart-5 rounded-full animate-pulse" />
-                  Listening for voice commands...
-                </p>
-              </div>
-            )}
-          </div>
+          )}
         </CardContent>
       </Card>
 
