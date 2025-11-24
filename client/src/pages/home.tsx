@@ -10,8 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { AlertTriangle, MapPin, Users, Shield, AlertCircle, AlertOctagon, Mic } from "lucide-react";
-import crimeDashboardImg from "@assets/generated_images/crime_dashboard_ui_concept.png";
-import protectionShieldImg from "@assets/generated_images/protection_shield_badge.png";
 import type { EmergencyContact, CrimeReport } from "@shared/schema";
 import {
   AlertDialog,
@@ -425,14 +423,6 @@ export default function Home() {
 
   return (
     <div className="space-y-6 relative">
-      {/* Decorative background images */}
-      <div className="fixed bottom-0 right-0 opacity-5 pointer-events-none z-0 max-w-sm">
-        <img src={crimeDashboardImg} alt="" className="w-full h-auto" />
-      </div>
-      <div className="fixed top-32 left-4 opacity-8 pointer-events-none z-0 max-w-xs">
-        <img src={protectionShieldImg} alt="" className="w-24 h-24" />
-      </div>
-
       {/* Emergency Helpline */}
       <div className="fixed top-4 right-4 z-40 md:top-6 md:right-6">
         <a 
