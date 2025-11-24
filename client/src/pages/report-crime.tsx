@@ -8,6 +8,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import crimeMapImg from "@assets/generated_images/crime_map_visualization.png";
 import {
   Form,
   FormControl,
@@ -434,6 +435,11 @@ export default function ReportCrime() {
 
   return (
     <div className="space-y-6 max-w-4xl relative">
+      {/* Crime map visualization background */}
+      <div className="fixed bottom-0 left-0 opacity-5 pointer-events-none z-0 max-w-md">
+        <img src={crimeMapImg} alt="" className="w-full h-auto" />
+      </div>
+
       <div className="relative z-10">
         <h1 className="text-3xl font-heading font-bold tracking-tight">Report a Crime</h1>
         <p className="text-muted-foreground mt-1">
