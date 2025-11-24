@@ -170,6 +170,7 @@ export default function SafePlaces() {
     let watchId: number | null = null;
     let bestAccuracy = Infinity;
     let bestPosition: { latitude: number; longitude: number; accuracy: number } | null = null;
+    let locationAccepted = false;
 
     const timeoutId = setTimeout(async () => {
       console.log("[GPS Safe Places] Timeout reached");
@@ -177,23 +178,28 @@ export default function SafePlaces() {
         navigator.geolocation.clearWatch(watchId);
       }
       
-      // Use best position if found, otherwise use fallback
-      const finalLocation = bestPosition || fallbackLocation;
-      
-      console.log(`[GPS Safe Places] Using location: ±${Math.round(finalLocation.accuracy)}m`);
-      setCurrentLocation(finalLocation);
-      setDisplayLocation(finalLocation);
-      setLocation({
-        latitude: finalLocation.latitude,
-        longitude: finalLocation.longitude,
-        name: bestPosition ? "Current Location" : "Default Location",
-      });
-      setLocationStatus("active");
-    }, 60000); // 60 seconds total for better mobile accuracy
+      // If no location accepted yet, use best position or fallback
+      if (!locationAccepted) {
+        const finalLocation = bestPosition || fallbackLocation;
+        
+        console.log(`[GPS Safe Places] Using location: ±${Math.round(finalLocation.accuracy)}m`);
+        setCurrentLocation(finalLocation);
+        setDisplayLocation(finalLocation);
+        setLocation({
+          latitude: finalLocation.latitude,
+          longitude: finalLocation.longitude,
+          name: bestPosition ? "Current Location" : "Default Location",
+        });
+        setLocationStatus("active");
+        locationAccepted = true;
+      }
+    }, 15000); // 15 seconds - faster timeout for poor GPS
     
     console.log("[GPS Safe Places] Watching for location updates...");
     watchId = navigator.geolocation.watchPosition(
       async (position) => {
+        if (locationAccepted) return; // Already accepted a location
+
         const accuracy = Math.round(position.coords.accuracy);
         
         console.log(`[GPS Safe Places] Reading: ±${accuracy}m accuracy`);
@@ -209,9 +215,9 @@ export default function SafePlaces() {
           console.log(`[GPS Safe Places] ✓ Better accuracy found: ±${accuracy}m`);
         }
         
-        // Accept reading if accuracy is good (< 100m)
-        if (accuracy < 100) {
-          console.log(`[GPS Safe Places] ✓ Excellent accuracy achieved: ±${accuracy}m`);
+        // Accept reading if accuracy is acceptable (< 5km is reasonable for initial setup)
+        if (accuracy < 5000) {
+          console.log(`[GPS Safe Places] ✓ Acceptable accuracy achieved: ±${accuracy}m`);
           
           const currentLoc = {
             latitude: position.coords.latitude,
@@ -237,6 +243,7 @@ export default function SafePlaces() {
           }
           clearTimeout(timeoutId);
           setLocationStatus("active");
+          locationAccepted = true;
         }
       },
       (error) => {
@@ -245,21 +252,20 @@ export default function SafePlaces() {
         if (watchId !== null) {
           navigator.geolocation.clearWatch(watchId);
         }
-        let errorMsg = "Unable to get your location";
-        let errorStatus: "disabled" | "denied" = "disabled";
-
-        if (error.code === 1) {
-          errorMsg = "Location permission denied. Enable it in your browser settings to continue.";
-          errorStatus = "denied";
-        } else if (error.code === 2) {
-          errorMsg = "Location unavailable. Verify GPS is enabled on your device.";
-        } else if (error.code === 3) {
-          errorMsg = "Location request timed out. Please enable high accuracy GPS and retry.";
+        
+        // If error and no location accepted yet, use fallback
+        if (!locationAccepted) {
+          console.log("[GPS Safe Places] Using fallback due to GPS error");
+          setCurrentLocation(fallbackLocation);
+          setDisplayLocation(fallbackLocation);
+          setLocation({
+            latitude: fallbackLocation.latitude,
+            longitude: fallbackLocation.longitude,
+            name: "Default Location",
+          });
+          setLocationStatus("active");
+          locationAccepted = true;
         }
-
-        setLocationErrorMessage(errorMsg);
-        setLocationStatus(errorStatus);
-        setShowLocationAlert(true);
       },
       options
     );
@@ -314,24 +320,34 @@ export default function SafePlaces() {
         }
         
         reverseGeoTimer.current = setTimeout(async () => {
-          // Filter out readings with extremely poor accuracy (>50km is unrealistic)
-          if (currentLoc.accuracy > 50000) {
-            console.warn(`[GPS] Watch: Ignoring reading with poor accuracy: ±${currentLoc.accuracy}m`);
-            return;
-          }
-          
-          const { name: placeName, hierarchy, locationDetails } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
-          
-          setCurrentLocation({ ...currentLoc, placeName, hierarchy, locationDetails });
-          setDisplayLocation({ ...currentLoc, placeName, hierarchy, locationDetails });
-          if (!location) {
-            setLocation({
-              latitude: currentLoc.latitude,
-              longitude: currentLoc.longitude,
-              name: placeName,
-            });
-          }
+          // Always update location state with current reading
+          setCurrentLocation({ ...currentLoc });
+          setDisplayLocation({ ...currentLoc });
           setLocationStatus("active");
+          
+          // Only reverse geocode if accuracy is reasonable (to avoid excessive API calls for poor readings)
+          if (currentLoc.accuracy < 50000) {
+            const { name: placeName, hierarchy, locationDetails } = await fetchPlaceName(currentLoc.latitude, currentLoc.longitude, false);
+            
+            setCurrentLocation({ ...currentLoc, placeName, hierarchy, locationDetails });
+            setDisplayLocation({ ...currentLoc, placeName, hierarchy, locationDetails });
+            if (!location) {
+              setLocation({
+                latitude: currentLoc.latitude,
+                longitude: currentLoc.longitude,
+                name: placeName,
+              });
+            }
+          } else {
+            // For poor accuracy, still update location but don't reverse geocode
+            if (!location) {
+              setLocation({
+                latitude: currentLoc.latitude,
+                longitude: currentLoc.longitude,
+                name: "Current Location",
+              });
+            }
+          }
         }, 500);
       },
       (error) => {
