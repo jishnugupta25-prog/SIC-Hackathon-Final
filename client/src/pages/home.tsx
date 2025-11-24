@@ -585,7 +585,7 @@ export default function Home() {
           {isListening && (
             <div className="w-full border-t pt-4 mt-2">
               <div className="flex items-center gap-4">
-                <Mic className="h-4 w-4 text-chart-5 animate-pulse flex-shrink-0" />
+                <Mic className="h-4 w-4 text-chart-5 flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium">Voice Commands Active</p>
                   <p className="text-xs text-muted-foreground">Say "SOS", "emergency", "help", "danger", or "mayday"</p>
