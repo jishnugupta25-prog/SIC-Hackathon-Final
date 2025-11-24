@@ -164,7 +164,7 @@ export default function Home() {
   };
 
   // Fetch recent crime reports with polling for real-time updates
-  const { data: recentCrimes = [] } = useQuery<CrimeReport[]>({
+  const { data: recentCrimes = [], refetch: refetchCrimes } = useQuery<CrimeReport[]>({
     queryKey: ["/api/crimes/recent"],
     enabled: isAuthenticated,
     staleTime: 0, // Data is immediately stale so it refetches when invalidated
@@ -172,6 +172,16 @@ export default function Home() {
     refetchInterval: 30000, // Poll every 30 seconds for real-time updates
     refetchIntervalInBackground: true, // Keep polling even when tab is not focused
   });
+
+  // Force refetch if coming from report submission
+  useEffect(() => {
+    const needsRefresh = sessionStorage.getItem('needsRefresh');
+    if (needsRefresh === 'true') {
+      sessionStorage.removeItem('needsRefresh');
+      // Force a fresh fetch from server
+      refetchCrimes();
+    }
+  }, [refetchCrimes]);
 
 
   // Removed SOS Alert mutation - now handled in SOS messaging page

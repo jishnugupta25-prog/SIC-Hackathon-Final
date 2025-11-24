@@ -225,9 +225,11 @@ export default function ReportCrime() {
       return await res.json();
     },
     onSuccess: (data: any) => {
+      // Immediately invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ["/api/crimes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crimes/recent"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/crimes"] });
+      
       setReferenceNumber(data?.referenceNumber);
       setIsSuccess(true);
       toast({
@@ -235,10 +237,14 @@ export default function ReportCrime() {
         description: "Your report has been submitted successfully",
       });
       form.reset();
-      // Redirect to dashboard after 3 seconds so user sees success then updated reports
+      
+      // Set flag to force refetch when home component mounts
+      sessionStorage.setItem('needsRefresh', 'true');
+      
+      // Redirect to dashboard after showing success
       setTimeout(() => {
         navigate("/");
-      }, 3000);
+      }, 2000);
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
