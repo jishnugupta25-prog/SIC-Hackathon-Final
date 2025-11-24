@@ -158,6 +158,9 @@ export default function SafePlaces() {
 
   // Request location function using useCallback (can be called from multiple places)
   const requestLocationFn = () => {
+    // Fallback location (center of India)
+    const fallbackLocation = { latitude: 20.5937, longitude: 78.9629, accuracy: 50000 };
+
     const options = {
       enableHighAccuracy: true,
       timeout: 20000,
@@ -169,27 +172,25 @@ export default function SafePlaces() {
     let bestAccuracy = Infinity;
     let bestPosition: { latitude: number; longitude: number; accuracy: number } | null = null;
 
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(async () => {
       console.log("[GPS Safe Places] Timeout reached");
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
       }
-      if (bestPosition) {
-        console.log(`[GPS Safe Places] Using best reading: ±${Math.round(bestPosition.accuracy)}m`);
-        setCurrentLocation(bestPosition);
-        setDisplayLocation(bestPosition);
-        setLocation({
-          latitude: bestPosition.latitude,
-          longitude: bestPosition.longitude,
-          name: "Current Location",
-        });
-      } else {
-        setLocationStatus("disabled");
-        setLocationErrorMessage("Location request timed out. Please try again.");
-        setShowLocationAlert(true);
-      }
+      
+      // Use best position if found, otherwise use fallback
+      const finalLocation = bestPosition || fallbackLocation;
+      
+      console.log(`[GPS Safe Places] Using location: ±${Math.round(finalLocation.accuracy)}m`);
+      setCurrentLocation(finalLocation);
+      setDisplayLocation(finalLocation);
+      setLocation({
+        latitude: finalLocation.latitude,
+        longitude: finalLocation.longitude,
+        name: bestPosition ? "Current Location" : "Default Location",
+      });
       setLocationStatus("active");
-    }, 30000); // 30 seconds total
+    }, 60000); // 60 seconds total for better mobile accuracy
     
     console.log("[GPS Safe Places] Watching for location updates...");
     watchId = navigator.geolocation.watchPosition(
