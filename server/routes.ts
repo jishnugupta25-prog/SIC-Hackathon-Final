@@ -7,7 +7,8 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { sendSosMessage } from "./twilio";
 import { analyzeCrimePatterns } from "./gemini";
-import { insertEmergencyContactSchema, insertCrimeReportSchema, insertSosAlertSchema, insertAdminFeedbackSchema } from "@shared/schema";
+import { insertEmergencyContactSchema, insertCrimeReportSchema, insertSosAlertSchema, insertAdminFeedbackSchema, crimeReports } from "@shared/schema";
+import { getDb } from "./db";
 import * as bcrypt from "bcryptjs";
 import { initializeDatabase } from "./initDb";
 
@@ -1478,9 +1479,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Helper function to get all crimes
   async function getAllCrimesForRoutes() {
     try {
-      const { crimeReports: crimeReportsTable } = await import("@shared/schema");
-      const { db } = await import("./db");
-      const crimes = await db.select().from(crimeReportsTable);
+      const db = await getDb();
+      const crimes = await db.select().from(crimeReports);
       return crimes;
     } catch {
       return [];

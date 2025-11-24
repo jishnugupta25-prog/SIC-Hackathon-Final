@@ -72,6 +72,8 @@ export default function ReportCrime() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+  const [isUsingFallback, setIsUsingFallback] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState<string>("");
   const [selectedLocation, setSelectedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -105,6 +107,8 @@ export default function ReportCrime() {
     if (!navigator.geolocation) {
       console.warn("Geolocation not available, using fallback location");
       setLocation(fallbackLocation);
+      setIsUsingFallback(true);
+      setLocationAccuracy(null);
       return;
     }
 
@@ -143,6 +147,8 @@ export default function ReportCrime() {
         if (accuracy < 100) {
           console.log(`[Crime Report GPS] ✓ Excellent accuracy achieved: ±${Math.round(accuracy)}m`);
           setLocation(newLocation);
+          setLocationAccuracy(accuracy);
+          setIsUsingFallback(false);
           if (watchId !== null) {
             navigator.geolocation.clearWatch(watchId);
             watchId = null;
@@ -156,9 +162,13 @@ export default function ReportCrime() {
         if (bestPosition) {
           console.log(`[Crime Report GPS] Using best reading found: ±${Math.round(bestAccuracy)}m`);
           setLocation(bestPosition);
+          setLocationAccuracy(bestAccuracy);
+          setIsUsingFallback(false);
         } else {
           console.log("[Crime Report GPS] Using fallback location");
           setLocation(fallbackLocation);
+          setIsUsingFallback(true);
+          setLocationAccuracy(null);
         }
       },
       options
@@ -174,9 +184,13 @@ export default function ReportCrime() {
       if (bestPosition) {
         console.log(`[Crime Report GPS] Using best reading found: ±${Math.round(bestAccuracy)}m`);
         setLocation(bestPosition);
+        setLocationAccuracy(bestAccuracy);
+        setIsUsingFallback(false);
       } else {
         console.log("[Crime Report GPS] Using fallback location");
         setLocation(fallbackLocation);
+        setIsUsingFallback(true);
+        setLocationAccuracy(null);
       }
     }, 30000);
 
@@ -547,12 +561,17 @@ export default function ReportCrime() {
                       variant="outline"
                       size="sm"
                       onClick={useCurrentLocation}
-                      disabled={!location}
+                      disabled={!location || isUsingFallback}
                       data-testid="button-use-location"
                     >
                       <MapPin className="h-4 w-4 mr-2" />
-                      {location ? "Use Current Location" : "Location Unavailable"}
+                      {!location ? "Location Unavailable" : isUsingFallback ? "Using Default Location" : "Use Current Location"}
                     </Button>
+                    {location && (
+                      <span className="text-xs text-muted-foreground">
+                        {isUsingFallback ? "⚠️ GPS not available" : locationAccuracy ? `±${Math.round(locationAccuracy)}m` : "Loading..."}
+                      </span>
+                    )}
                   </div>
 
                   {selectedLocation && (
