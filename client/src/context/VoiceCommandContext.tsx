@@ -56,6 +56,13 @@ let globalRecognition: any = null;
 let shouldKeepListening = false;
 let isCurrentlyListening = false;
 let emergencyContactsRef: any[] = [];
+let lastRestartTime = 0;
+let restartAttempts = 0;
+
+// Detect if on mobile device
+function isMobile() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
 
 export function VoiceCommandProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -209,16 +216,40 @@ export function VoiceCommandProvider({ children }: { children: ReactNode }) {
         console.log('[Global Voice] Listening stopped, auto-restarting...');
         
         if (shouldKeepListening && globalRecognition && emergencyContactsRef.length > 0) {
-          setTimeout(() => {
-            if (shouldKeepListening && globalRecognition && emergencyContactsRef.length > 0) {
-              try {
-                console.log('[Global Voice] Restarting...');
-                globalRecognition.start();
-              } catch (e) {
-                console.log('[Global Voice] Restart failed:', e);
+          const now = Date.now();
+          const timeSinceLastRestart = now - lastRestartTime;
+          
+          // Use longer delay on mobile (8s) and shorter on desktop (3s)
+          const delayMs = isMobile() ? 8000 : 3000;
+          
+          // Cooldown: prevent restarts faster than the delay interval
+          if (timeSinceLastRestart < delayMs) {
+            const waitTime = delayMs - timeSinceLastRestart;
+            console.log(`[Global Voice] Cooldown active, waiting ${waitTime}ms before restart attempt`);
+            setTimeout(() => {
+              if (shouldKeepListening && globalRecognition && emergencyContactsRef.length > 0) {
+                try {
+                  lastRestartTime = Date.now();
+                  console.log('[Global Voice] Restarting after cooldown...');
+                  globalRecognition.start();
+                } catch (e) {
+                  console.log('[Global Voice] Restart failed:', e);
+                }
               }
-            }
-          }, 3000); // Longer delay to prevent rapid mic cycling and visual blinking
+            }, waitTime);
+          } else {
+            lastRestartTime = now;
+            setTimeout(() => {
+              if (shouldKeepListening && globalRecognition && emergencyContactsRef.length > 0) {
+                try {
+                  console.log('[Global Voice] Restarting...');
+                  globalRecognition.start();
+                } catch (e) {
+                  console.log('[Global Voice] Restart failed:', e);
+                }
+              }
+            }, delayMs);
+          }
         }
       };
     }
