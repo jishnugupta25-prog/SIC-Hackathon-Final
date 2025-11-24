@@ -97,7 +97,7 @@ export function useVoiceCommands(config: VoiceCommandConfig) {
               console.log('[Voice Commands] Restarting listening...');
               recognitionRef.current.start();
             }
-          }, 50); // Faster restart for better responsiveness
+          }, 3000); // Longer delay to prevent rapid mic cycling and address bar blinking
         } catch (error) {
           console.log('[Voice Commands] Auto-restart failed:', error);
         }

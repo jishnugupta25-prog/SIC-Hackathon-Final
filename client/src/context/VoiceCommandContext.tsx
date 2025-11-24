@@ -185,7 +185,7 @@ export function VoiceCommandProvider({ children }: { children: ReactNode }) {
                 console.log('[Global Voice] Restart failed:', e);
               }
             }
-          }, 1000);
+          }, 3000); // Longer delay to prevent rapid mic cycling and visual blinking
         }
       };
     }
