@@ -186,7 +186,7 @@ export default function Home() {
 
   // Removed SOS Alert mutation - now handled in SOS messaging page
 
-  // Get current location with fallback
+  // Get current location with continuous tracking for real-time danger zone alerts
   useEffect(() => {
     // Fallback location (center of India)
     const fallbackLocation = { latitude: 20.5937, longitude: 78.9629 };
@@ -200,7 +200,8 @@ export default function Home() {
     let watchId: number | null = null;
     let bestAccuracy = Infinity;
     let bestPosition: { latitude: number; longitude: number } | null = null;
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: NodeJS.Timeout | null = null;
+    let initialLocationSet = false;
 
     const options = {
       enableHighAccuracy: true,
@@ -208,9 +209,9 @@ export default function Home() {
       maximumAge: 0,
     };
 
-    console.log("[SOS GPS] Requesting location with improved accuracy...");
+    console.log("[Real-time Location] Starting continuous location tracking for danger zone detection");
 
-    // Watch for location updates
+    // Watch for location updates CONTINUOUSLY for real-time danger zone alerts
     watchId = navigator.geolocation.watchPosition(
       (position) => {
         const accuracy = position.coords.accuracy;
@@ -219,73 +220,74 @@ export default function Home() {
           longitude: position.coords.longitude,
         };
 
-        console.log(`[SOS GPS] Reading: ±${Math.round(accuracy)}m accuracy`);
+        console.log(`[Real-time Location] Reading: ±${Math.round(accuracy)}m accuracy`);
 
         // Keep track of the best reading
         if (accuracy < bestAccuracy) {
           bestAccuracy = accuracy;
           bestPosition = newLocation;
-          console.log(`[SOS GPS] ✓ Better accuracy found: ±${Math.round(accuracy)}m`);
+          console.log(`[Real-time Location] ✓ Better accuracy found: ±${Math.round(accuracy)}m`);
         }
 
-        // Accept reading if accuracy is good (< 100m)
-        if (accuracy < 100) {
-          console.log(`[SOS GPS] ✓ Excellent accuracy achieved: ±${Math.round(accuracy)}m`);
-          setLocation(newLocation);
-          if (watchId !== null) {
-            navigator.geolocation.clearWatch(watchId);
-            watchId = null;
-          }
+        // Always update location to latest position for real-time danger detection
+        setLocation(newLocation);
+
+        // Clear initial timeout once we have a reading
+        if (!initialLocationSet && timeoutId) {
           clearTimeout(timeoutId);
+          timeoutId = null;
+          initialLocationSet = true;
         }
       },
       (error) => {
-        console.error("[SOS GPS] Error:", error.code, error.message);
+        console.error("[Real-time Location] Error:", error.code, error.message);
         // Use best position found so far or fallback
         if (bestPosition) {
-          console.log(`[SOS GPS] Using best reading found: ±${Math.round(bestAccuracy)}m`);
+          console.log(`[Real-time Location] Using best reading found: ±${Math.round(bestAccuracy)}m`);
           setLocation(bestPosition);
-        } else {
-          console.log("[SOS GPS] Using fallback location");
+        } else if (!initialLocationSet) {
+          console.log("[Real-time Location] Using fallback location");
           setLocation(fallbackLocation);
         }
       },
       options
     );
 
-    // Timeout after 30 seconds - use best reading found
+    // Initial timeout (30 seconds) - use best reading found to set initial location
     timeoutId = setTimeout(() => {
-      console.log("[SOS GPS] Timeout reached");
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-      }
-      if (bestPosition) {
-        console.log(`[SOS GPS] Using best reading found: ±${Math.round(bestAccuracy)}m`);
+      console.log("[Real-time Location] Initial timeout reached");
+      if (bestPosition && !initialLocationSet) {
+        console.log(`[Real-time Location] Using best reading found: ±${Math.round(bestAccuracy)}m`);
         setLocation(bestPosition);
-      } else {
-        console.log("[SOS GPS] Using fallback location");
+      } else if (!initialLocationSet) {
+        console.log("[Real-time Location] Using fallback location");
         setLocation(fallbackLocation);
       }
+      initialLocationSet = true;
     }, 30000);
 
-    // Cleanup on unmount
+    // Cleanup on unmount - but keep watching for location
     return () => {
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
       }
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, []);
 
-  // Monitor for entry into high-crime areas (predictive safety alerts)
+  // Monitor for entry into high-crime areas (predictive safety alerts) - runs on EVERY location update
   useEffect(() => {
     if (!location || recentCrimes.length === 0) {
       setDangerZoneAlert(null);
+      setAlertShown(""); // Reset alert tracking when no crimes
       return;
     }
 
     const hotspots = detectCrimeHotspots();
+    
+    console.log(`[Danger Zone] Checking ${hotspots.length} hotspots from user location: ${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`);
     
     // Check if user is in a danger zone (within 1km of a high-crime hotspot)
     const dangerZone = hotspots.find((hotspot) => {
@@ -295,31 +297,44 @@ export default function Home() {
         hotspot.lat,
         hotspot.lon
       );
+      console.log(`[Danger Zone] Hotspot distance: ${distance.toFixed(2)}km with ${hotspot.crimes.length} crimes`);
       return distance < 1 && hotspot.crimes.length >= 3; // High-crime area has 3+ crimes
     });
 
     if (dangerZone) {
-      const hotspotId = `${dangerZone.lat}-${dangerZone.lon}`;
+      const hotspotId = `${dangerZone.lat.toFixed(4)}-${dangerZone.lon.toFixed(4)}`;
       
-      // Only show alert if we haven't shown it for this hotspot recently
+      console.log(`[Danger Zone] User IN danger zone: ${hotspotId} with ${dangerZone.crimes.length} crimes`);
+      
+      // Show alert if entering NEW danger zone (different from previous)
       if (alertShown !== hotspotId) {
+        console.log(`[Danger Zone] Showing alert for new zone: ${hotspotId}`);
+        
         setDangerZoneAlert({
           message: `⚠️ High-crime area detected! ${dangerZone.crimes.length} recent crimes nearby. Stay alert.`,
           crimeCount: dangerZone.crimes.length,
         });
         setAlertShown(hotspotId);
 
-        // Show toast notification
+        // Show toast notification - ALWAYS show when entering new zone
         toast({
           title: "⚠️ Danger Zone Alert",
           description: `You're entering a high-crime area with ${dangerZone.crimes.length} recent incidents. Stay alert and avoid if possible.`,
           variant: "destructive",
         });
+      } else {
+        // Still in same danger zone, keep alert displayed
+        console.log(`[Danger Zone] Still in same zone, maintaining alert`);
       }
     } else {
+      // User LEFT the danger zone
+      if (alertShown !== "") {
+        console.log(`[Danger Zone] User LEFT danger zone`);
+        setAlertShown(""); // Reset so we can alert again if re-entering
+      }
       setDangerZoneAlert(null);
     }
-  }, [location, recentCrimes, alertShown, toast]);
+  }, [location, recentCrimes, toast]);
 
   // Handle SOS button click
   const handleSosClick = () => {
