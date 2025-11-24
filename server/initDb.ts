@@ -44,15 +44,19 @@ export async function initializeDatabase() {
 
         CREATE TABLE IF NOT EXISTS "crime_reports" (
           "id" text PRIMARY KEY DEFAULT gen_random_uuid(),
+          "reference_number" varchar(10) UNIQUE NOT NULL,
           "user_id" text NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
           "crime_type" text,
           "description" text,
           "latitude" numeric,
           "longitude" numeric,
           "address" text,
+          "phone_number" text NOT NULL,
           "is_anonymous" integer DEFAULT 0,
           "reported_at" timestamp DEFAULT current_timestamp,
-          "created_at" timestamp DEFAULT current_timestamp
+          "created_at" timestamp DEFAULT current_timestamp,
+          "evidence_urls" text,
+          "voice_message_url" text
         );
 
         CREATE TABLE IF NOT EXISTS "sos_alerts" (
@@ -139,15 +143,19 @@ export async function initializeDatabase() {
 
         CREATE TABLE IF NOT EXISTS "crime_reports" (
           "id" text PRIMARY KEY,
+          "reference_number" text UNIQUE NOT NULL,
           "user_id" text NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
           "crime_type" text,
           "description" text,
           "latitude" real,
           "longitude" real,
           "address" text,
+          "phone_number" text NOT NULL,
           "is_anonymous" integer DEFAULT 0,
           "reported_at" datetime DEFAULT current_timestamp,
-          "created_at" datetime DEFAULT current_timestamp
+          "created_at" datetime DEFAULT current_timestamp,
+          "evidence_urls" text,
+          "voice_message_url" text
         );
 
         CREATE TABLE IF NOT EXISTS "sos_alerts" (
