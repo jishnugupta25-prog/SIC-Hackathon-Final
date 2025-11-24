@@ -168,7 +168,7 @@ export default function Home() {
   const { data: recentCrimes = [] } = useQuery<CrimeReport[]>({
     queryKey: ["/api/crimes/recent"],
     enabled: isAuthenticated,
-    refetchInterval: 5000, // Poll every 5 seconds for real-time updates
+    refetchInterval: 30000, // Poll every 30 seconds for real-time updates
     refetchIntervalInBackground: true, // Keep polling even when tab is not focused
   });
 
@@ -582,17 +582,15 @@ export default function Home() {
           </div>
 
           {/* Voice Command Status */}
-          {isListening && (
-            <div className="w-full border-t pt-4 mt-2">
-              <div className="flex items-center gap-4">
-                <Mic className="h-4 w-4 text-chart-5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium">Voice Commands Active</p>
-                  <p className="text-xs text-muted-foreground">Say "SOS", "emergency", "help", "danger", or "mayday"</p>
-                </div>
+          <div className="w-full border-t pt-4 mt-2" style={{ visibility: isListening ? 'visible' : 'hidden' }}>
+            <div className="flex items-center gap-4">
+              <Mic className="h-4 w-4 text-chart-5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium">Voice Commands Active</p>
+                <p className="text-xs text-muted-foreground">Say "SOS", "emergency", "help", "danger", or "mayday"</p>
               </div>
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
 

@@ -185,7 +185,7 @@ export function VoiceCommandProvider({ children }: { children: ReactNode }) {
                 console.log('[Global Voice] Restart failed:', e);
               }
             }
-          }, 50);
+          }, 1000);
         }
       };
     }
