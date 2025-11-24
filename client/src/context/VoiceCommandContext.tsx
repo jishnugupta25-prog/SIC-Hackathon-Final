@@ -4,11 +4,15 @@ import { useAuth } from '@/hooks/useAuth';
 interface VoiceCommandContextType {
   isListening: boolean;
   setEmergencyContacts: (contacts: any[]) => void;
+  isVoiceEnabled: boolean;
+  setVoiceEnabled: (enabled: boolean) => void;
 }
 
 const VoiceCommandContext = createContext<VoiceCommandContextType>({ 
   isListening: false,
-  setEmergencyContacts: () => {}
+  setEmergencyContacts: () => {},
+  isVoiceEnabled: true,
+  setVoiceEnabled: () => {}
 });
 
 export function useGlobalVoiceCommands() {
@@ -57,6 +61,12 @@ export function VoiceCommandProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [isListening, setIsListening] = useState(false);
   const [emergencyContacts, setEmergencyContactsState] = useState<any[]>([]);
+  const [isVoiceEnabled, setIsVoiceEnabledState] = useState(() => {
+    // Load preference from localStorage, default to true
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem('voiceCommandsEnabled');
+    return saved === null ? true : saved === 'true';
+  });
   const listenerRef = useRef<((isListening: boolean) => void) | null>(null);
 
   // Update emergency contacts
@@ -64,6 +74,13 @@ export function VoiceCommandProvider({ children }: { children: ReactNode }) {
     emergencyContactsRef = contacts;
     setEmergencyContactsState(contacts);
     console.log(`[Global Voice] Emergency contacts updated: ${contacts.length} contact${contacts.length !== 1 ? 's' : ''}`);
+  };
+
+  // Update voice enabled preference and save to localStorage
+  const setVoiceEnabled = (enabled: boolean) => {
+    setIsVoiceEnabledState(enabled);
+    localStorage.setItem('voiceCommandsEnabled', String(enabled));
+    console.log(`[Global Voice] Voice commands ${enabled ? 'enabled' : 'disabled'}`);
   };
 
   useEffect(() => {
@@ -85,6 +102,22 @@ export function VoiceCommandProvider({ children }: { children: ReactNode }) {
     // Don't activate if no emergency contacts
     if (emergencyContacts.length === 0) {
       console.log('[Global Voice] No emergency contacts - voice commands disabled');
+      shouldKeepListening = false;
+      isCurrentlyListening = false;
+      setIsListening(false);
+      if (globalRecognition) {
+        try {
+          globalRecognition.stop();
+        } catch (e) {
+          // Ignore
+        }
+      }
+      return;
+    }
+
+    // Don't activate if user disabled voice commands
+    if (!isVoiceEnabled) {
+      console.log('[Global Voice] Voice commands disabled by user');
       shouldKeepListening = false;
       isCurrentlyListening = false;
       setIsListening(false);
@@ -200,10 +233,10 @@ export function VoiceCommandProvider({ children }: { children: ReactNode }) {
     return () => {
       // Don't stop on unmount - keep listening
     };
-  }, [isAuthenticated, authLoading, emergencyContacts.length]);
+  }, [isAuthenticated, authLoading, emergencyContacts.length, isVoiceEnabled]);
 
   return (
-    <VoiceCommandContext.Provider value={{ isListening, setEmergencyContacts }}>
+    <VoiceCommandContext.Provider value={{ isListening, setEmergencyContacts, isVoiceEnabled, setVoiceEnabled }}>
       {children}
     </VoiceCommandContext.Provider>
   );

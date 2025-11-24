@@ -8,6 +8,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { AlertTriangle, MapPin, Users, Shield, AlertCircle, AlertOctagon, Mic } from "lucide-react";
 import crimeDashboardImg from "@assets/generated_images/crime_dashboard_ui_concept.png";
 import protectionShieldImg from "@assets/generated_images/protection_shield_badge.png";
@@ -41,7 +42,7 @@ export default function Home() {
   });
 
   // Use global voice commands
-  const { isListening, setEmergencyContacts } = useGlobalVoiceCommands();
+  const { isListening, setEmergencyContacts, isVoiceEnabled, setVoiceEnabled } = useGlobalVoiceCommands();
 
   // Update global voice commands with emergency contacts
   useEffect(() => {
@@ -583,12 +584,19 @@ export default function Home() {
 
           {/* Voice Command Status */}
           <div className="w-full border-t pt-4 mt-2" style={{ visibility: contacts.length > 0 ? 'visible' : 'hidden' }}>
-            <div className="flex items-center gap-4">
-              <Mic className="h-4 w-4 text-chart-5 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium">Voice Commands Active</p>
-                <p className="text-xs text-muted-foreground">Say "SOS", "emergency", "help", "danger", or "mayday"</p>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Mic className={`h-4 w-4 flex-shrink-0 ${isVoiceEnabled ? 'text-chart-5' : 'text-muted-foreground'}`} />
+                <div>
+                  <p className="text-sm font-medium">Voice Commands</p>
+                  <p className="text-xs text-muted-foreground">Say "SOS", "emergency", "help", "danger", or "mayday"</p>
+                </div>
               </div>
+              <Switch
+                checked={isVoiceEnabled}
+                onCheckedChange={setVoiceEnabled}
+                data-testid="toggle-voice-commands"
+              />
             </div>
           </div>
         </CardContent>
