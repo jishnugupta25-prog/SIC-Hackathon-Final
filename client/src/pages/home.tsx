@@ -32,6 +32,7 @@ export default function Home() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [dangerZoneAlert, setDangerZoneAlert] = useState<{ message: string; crimeCount: number } | null>(null);
   const [alertShown, setAlertShown] = useState<string>("");  // Track which hotspots we've alerted about
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   // Fetch emergency contacts
   const { data: contacts = [] } = useQuery<EmergencyContact[]>({
@@ -80,6 +81,23 @@ export default function Home() {
     window.addEventListener('voiceCommandDetected', handleVoiceCommand);
     return () => window.removeEventListener('voiceCommandDetected', handleVoiceCommand);
   }, [contacts, location, toast]);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then((permission) => {
+        if (permission === 'granted') {
+          console.log("[Push Notifications] Permission granted");
+          setNotificationsEnabled(true);
+        } else {
+          console.log("[Push Notifications] Permission denied");
+          setNotificationsEnabled(false);
+        }
+      });
+    } else if ('Notification' in window && Notification.permission === 'granted') {
+      setNotificationsEnabled(true);
+    }
+  }, []);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -192,7 +210,7 @@ export default function Home() {
     const fallbackLocation = { latitude: 20.5937, longitude: 78.9629 };
 
     if (!navigator.geolocation) {
-      console.warn("Geolocation not available, using fallback location");
+      console.warn("[Location] Geolocation not available, using fallback location");
       setLocation(fallbackLocation);
       return;
     }
@@ -204,12 +222,12 @@ export default function Home() {
     let initialLocationSet = false;
 
     const options = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0,
+      enableHighAccuracy: true,  // Get high accuracy
+      timeout: 5000,             // Lower timeout for faster updates
+      maximumAge: 0,             // Always get fresh position
     };
 
-    console.log("[Real-time Location] Starting continuous location tracking for danger zone detection");
+    console.log("[Location] Starting continuous location tracking for real-time danger zone detection");
 
     // Watch for location updates CONTINUOUSLY for real-time danger zone alerts
     watchId = navigator.geolocation.watchPosition(
@@ -220,13 +238,13 @@ export default function Home() {
           longitude: position.coords.longitude,
         };
 
-        console.log(`[Real-time Location] Reading: ±${Math.round(accuracy)}m accuracy`);
+        console.log(`[Location] Position update: ±${Math.round(accuracy)}m accuracy`);
 
         // Keep track of the best reading
         if (accuracy < bestAccuracy) {
           bestAccuracy = accuracy;
           bestPosition = newLocation;
-          console.log(`[Real-time Location] ✓ Better accuracy found: ±${Math.round(accuracy)}m`);
+          console.log(`[Location] ✓ Accuracy improved to: ±${Math.round(accuracy)}m`);
         }
 
         // Always update location to latest position for real-time danger detection
@@ -237,34 +255,38 @@ export default function Home() {
           clearTimeout(timeoutId);
           timeoutId = null;
           initialLocationSet = true;
+          console.log("[Location] ✓ Initial location set");
         }
       },
       (error) => {
-        console.error("[Real-time Location] Error:", error.code, error.message);
+        console.error("[Location] Error:", error.code, error.message);
         // Use best position found so far or fallback
-        if (bestPosition) {
-          console.log(`[Real-time Location] Using best reading found: ±${Math.round(bestAccuracy)}m`);
+        if (bestPosition && !initialLocationSet) {
+          console.log(`[Location] Using best reading found: ±${Math.round(bestAccuracy)}m`);
           setLocation(bestPosition);
+          initialLocationSet = true;
         } else if (!initialLocationSet) {
-          console.log("[Real-time Location] Using fallback location");
+          console.log("[Location] Using fallback location");
           setLocation(fallbackLocation);
+          initialLocationSet = true;
         }
       },
       options
     );
 
-    // Initial timeout (30 seconds) - use best reading found to set initial location
+    // Initial timeout (20 seconds) - use best reading found to set initial location
     timeoutId = setTimeout(() => {
-      console.log("[Real-time Location] Initial timeout reached");
+      console.log("[Location] Initial timeout reached (20s)");
       if (bestPosition && !initialLocationSet) {
-        console.log(`[Real-time Location] Using best reading found: ±${Math.round(bestAccuracy)}m`);
+        console.log(`[Location] Setting location from best reading: ±${Math.round(bestAccuracy)}m`);
         setLocation(bestPosition);
+        initialLocationSet = true;
       } else if (!initialLocationSet) {
-        console.log("[Real-time Location] Using fallback location");
+        console.log("[Location] Setting fallback location");
         setLocation(fallbackLocation);
+        initialLocationSet = true;
       }
-      initialLocationSet = true;
-    }, 30000);
+    }, 20000);
 
     // Cleanup on unmount - but keep watching for location
     return () => {
@@ -322,6 +344,17 @@ export default function Home() {
           description: `You're entering a high-crime area with ${dangerZone.crimes.length} recent incidents. Stay alert and avoid if possible.`,
           variant: "destructive",
         });
+
+        // Send push notification if enabled
+        if (notificationsEnabled && 'Notification' in window) {
+          console.log("[Push Notifications] Sending danger zone alert notification");
+          new Notification("⚠️ Danger Zone Alert", {
+            body: `You have entered a high-crime area with ${dangerZone.crimes.length} recent incidents nearby. Stay alert and avoid if possible.`,
+            icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23dc2626'/><text x='50' y='60' text-anchor='middle' font-size='60' fill='white' font-weight='bold'>!</text></svg>",
+            tag: "danger-zone-alert",
+            requireInteraction: true,
+          });
+        }
       } else {
         // Still in same danger zone, keep alert displayed
         console.log(`[Danger Zone] Still in same zone, maintaining alert`);
@@ -334,7 +367,7 @@ export default function Home() {
       }
       setDangerZoneAlert(null);
     }
-  }, [location, recentCrimes, toast]);
+  }, [location, recentCrimes, toast, notificationsEnabled]);
 
   // Handle SOS button click
   const handleSosClick = () => {
@@ -476,35 +509,42 @@ export default function Home() {
         </p>
       </div>
 
-      {/* Predictive Safety Alert - High-Crime Zone Warning */}
+      {/* Predictive Safety Alert - High-Crime Zone Warning - PERSISTENT */}
       {dangerZoneAlert && (
         <Card className="border-destructive/50 bg-destructive/5 relative z-10 animate-pulse" data-testid="alert-danger-zone">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
               <AlertOctagon className="h-6 w-6 text-destructive flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="font-semibold text-destructive mb-1">Danger Zone Alert</h3>
-                <p className="text-sm text-destructive/90">
+                <h3 className="font-semibold text-destructive mb-1">⚠️ You have Entered a High-Crime Zone</h3>
+                <p className="text-sm text-destructive/90 font-medium mb-3">
                   You're within 1km of a high-crime area with {dangerZoneAlert.crimeCount} recent incidents. 
                   Stay alert, avoid if possible, and keep your phone charged.
                 </p>
-                <Button
-                  onClick={() => setNavigateLocation("/crime-map")}
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  data-testid="button-view-danger-map"
-                >
-                  View Crime Map
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setNavigateLocation("/crime-map")}
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                    data-testid="button-view-danger-map"
+                  >
+                    View Crime Map
+                  </Button>
+                  <Button
+                    onClick={() => setNavigateLocation("/safe-places")}
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                    data-testid="button-find-safe-places"
+                  >
+                    Find Safe Places
+                  </Button>
+                </div>
+                <p className="text-xs text-destructive/70 mt-3 font-medium">
+                  This alert will remain active while you are in this danger zone.
+                </p>
               </div>
-              <button
-                onClick={() => setDangerZoneAlert(null)}
-                className="text-destructive/50 hover:text-destructive flex-shrink-0"
-                data-testid="button-dismiss-danger-alert"
-              >
-                ✕
-              </button>
             </div>
           </CardContent>
         </Card>
