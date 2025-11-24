@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -71,6 +72,7 @@ const crimeTypes = [
 export default function ReportCrime() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [isUsingFallback, setIsUsingFallback] = useState(false);
@@ -233,9 +235,10 @@ export default function ReportCrime() {
         description: "Your report has been submitted successfully",
       });
       form.reset();
+      // Redirect to dashboard after 3 seconds so user sees success then updated reports
       setTimeout(() => {
-        setIsSuccess(false);
-      }, 5000);
+        navigate("/");
+      }, 3000);
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
