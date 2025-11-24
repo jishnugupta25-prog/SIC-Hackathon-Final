@@ -541,9 +541,6 @@ export default function Home() {
                     Find Safe Places
                   </Button>
                 </div>
-                <p className="text-xs text-destructive/70 mt-3 font-medium">
-                  This alert will remain active while you are in this danger zone.
-                </p>
               </div>
             </div>
           </CardContent>
