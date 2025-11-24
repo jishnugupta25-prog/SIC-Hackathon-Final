@@ -183,12 +183,16 @@ export default function SafePlaces() {
         const finalLocation = bestPosition || fallbackLocation;
         
         console.log(`[GPS Safe Places] Using location: ±${Math.round(finalLocation.accuracy)}m`);
-        setCurrentLocation(finalLocation);
-        setDisplayLocation(finalLocation);
+        
+        // Always fetch place name immediately for complete location details
+        const { name: placeName, hierarchy, locationDetails } = await fetchPlaceName(finalLocation.latitude, finalLocation.longitude, false);
+        
+        setCurrentLocation({ ...finalLocation, placeName, hierarchy, locationDetails });
+        setDisplayLocation({ ...finalLocation, placeName, hierarchy, locationDetails });
         setLocation({
           latitude: finalLocation.latitude,
           longitude: finalLocation.longitude,
-          name: bestPosition ? "Current Location" : "Default Location",
+          name: placeName,
         });
         setLocationStatus("active");
         locationAccepted = true;
@@ -246,7 +250,7 @@ export default function SafePlaces() {
           locationAccepted = true;
         }
       },
-      (error) => {
+      async (error) => {
         console.error("[GPS Safe Places] Error:", error.code, error.message);
         clearTimeout(timeoutId);
         if (watchId !== null) {
@@ -256,12 +260,16 @@ export default function SafePlaces() {
         // If error and no location accepted yet, use fallback
         if (!locationAccepted) {
           console.log("[GPS Safe Places] Using fallback due to GPS error");
-          setCurrentLocation(fallbackLocation);
-          setDisplayLocation(fallbackLocation);
+          
+          // Always fetch place name for complete location details
+          const { name: placeName, hierarchy, locationDetails } = await fetchPlaceName(fallbackLocation.latitude, fallbackLocation.longitude, false);
+          
+          setCurrentLocation({ ...fallbackLocation, placeName, hierarchy, locationDetails });
+          setDisplayLocation({ ...fallbackLocation, placeName, hierarchy, locationDetails });
           setLocation({
             latitude: fallbackLocation.latitude,
             longitude: fallbackLocation.longitude,
-            name: "Default Location",
+            name: placeName,
           });
           setLocationStatus("active");
           locationAccepted = true;
