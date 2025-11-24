@@ -582,7 +582,7 @@ export default function Home() {
           </div>
 
           {/* Voice Command Status */}
-          <div className="w-full border-t pt-4 mt-2" style={{ visibility: isListening ? 'visible' : 'hidden' }}>
+          <div className="w-full border-t pt-4 mt-2" style={{ visibility: contacts.length > 0 ? 'visible' : 'hidden' }}>
             <div className="flex items-center gap-4">
               <Mic className="h-4 w-4 text-chart-5 flex-shrink-0" />
               <div>
