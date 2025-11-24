@@ -167,6 +167,8 @@ export default function Home() {
   const { data: recentCrimes = [] } = useQuery<CrimeReport[]>({
     queryKey: ["/api/crimes/recent"],
     enabled: isAuthenticated,
+    staleTime: 0, // Data is immediately stale so it refetches when invalidated
+    refetchOnMount: true, // Always refetch fresh data when component mounts
     refetchInterval: 30000, // Poll every 30 seconds for real-time updates
     refetchIntervalInBackground: true, // Keep polling even when tab is not focused
   });
